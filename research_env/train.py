@@ -1,31 +1,41 @@
-import torch
-import torch.nn as nn
+import matplotlib.pyplot as plt
+import numpy as np
 
-class MyModel(nn.Module):
-    def __init__(self):
-        super(MyModel, self).__init__()
-        self.linear1 = nn.Linear(20, 10)
-        self.relu = nn.ReLU()
-        self.dropout = nn.Dropout(0.5)
-        self.linear2 = nn.Linear(10, 1)
+# Define the data point
+y_max = 10
+x = np.linspace(0, 2 * np.pi, 100)
+y = np.sin(x)
 
-    def forward(self, x):
-        x = self.linear1(x)
-        x = self.relu(x)
-        x = self.dropout(x)
-        x = self.linear2(x)
-        return x
+# Create the plot
+fig, ax = plt.subplots()
 
-# Example usage
-model = MyModel()
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=0.001)
+# Plot the data
+ax.plot(x, y, label='Data')
 
-# Training loop
-for epoch in range(num_epochs):
-    for inputs, targets in dataloader:
-        optimizer.zero_grad()
-        outputs = model(inputs)
-        loss = criterion(outputs, targets)
-        loss.backward()
-        optimizer.step()
+# Define the wave parameters
+frequency = 5
+amplitude = 0.08
+speed = 0.05
+starting_point = 0
+
+# Generate the wave
+time = np.arange(0, 2 * np.pi, speed)
+wave = amplitude * np.sin(frequency * time + starting_point)
+
+# Find the index of the maximum value
+max_index = np.argmax(y)
+max_time = time[max_index]
+
+# Plot the wave
+ax.plot(time, wave, color='red', label='Wave')
+
+# Add a vertical line to highlight the peak
+ax.axvline(max_time, color='blue', linestyle='--', label='Peak')
+
+# Add labels and legend
+ax.set_xlabel('Time')
+ax.set_ylabel('Value')
+ax.legend()
+
+# Show the plot
+plt.show()

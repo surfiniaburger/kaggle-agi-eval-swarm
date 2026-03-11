@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist/
+build/
+
+# Environment
+.env
+.env.*
+
+# UV
+uv.lock
+
+# Research artifacts (tracked separately by the agent)
+research_env/run.log
+research_env/progress.png
+research_env/*.bin
+research_env/data/
+
+# OS
+.DS_Store
+*.swp
+
+# pytest
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/

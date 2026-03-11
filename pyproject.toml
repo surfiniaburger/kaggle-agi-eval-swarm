@@ -1,0 +1,27 @@
+[project]
+name = "mental-research-swarm"
+version = "0.1.0"
+description = "Autonomous research swarm for LLM optimization"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "matplotlib>=3.10.8",
+    "numpy>=2.2.6",
+    "pandas>=2.3.3",
+    "pyarrow>=21.0.0",
+    "requests>=2.32.0",
+    "rustbpe>=0.1.0",
+    "tiktoken>=0.11.0",
+    "torch==2.6.0",
+    "google-adk>=0.1.0",
+    "litellm>=1.0.0",
+    "fastmcp==3.0.0b2",
+    "mcp>=1.0.0",
+    "google-genai>=1.0.0",
+    "pytest>=9.0.2",
+    "pytest-asyncio>=1.3.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["swarm*", "research_env*"]

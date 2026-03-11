@@ -94,7 +94,7 @@ class SwarmCoordinator(BaseAgent):
 
             # ── Step A: TheBrain analyzes and proposes ────────────
             logger.info(f"  🧠 [{self.skill_writer.name}] Analyzing results & proposing strategy...")
-            async for event in self.skill_writer._run_async_impl(ctx):
+            async for event in self.skill_writer.run_async(ctx):
                 yield event
             
             brain_output = ctx.session.state.get(self.skill_writer.output_key, "")
@@ -112,7 +112,7 @@ class SwarmCoordinator(BaseAgent):
 
             # ── Step B: TheHands generates code ───────────────────
             logger.info(f"  🔧 [{self.research_agent.name}] Generating modified train.py...")
-            async for event in self.research_agent._run_async_impl(ctx):
+            async for event in self.research_agent.run_async(ctx):
                 yield event
             
             validated_code = ctx.session.state.get("validated_code")

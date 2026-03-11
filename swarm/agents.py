@@ -32,12 +32,14 @@ class ResearchAgent(LlmAgent):
         program_md = ctx.session.state.get("program_md", "")
         train_py = ctx.session.state.get("train_py", "")
         
-        # We trigger the LLM call via the standard LlmAgent mechanism
-        # The LlmAgent's _run_async_impl will use the instruction and user message
-        # We need to ensure the user message contains the current code and strategy
+        original_instruction = self.instruction
+        self.instruction = f"{original_instruction}\n\nCURRENT STRATEGY:\n{program_md}\n\nCURRENT CODE (train.py):\n```python\n{train_py}\n```\n\nModify the code to implement the next step in the strategy. OUTPUT ONLY THE MODIFIED FULL PYTHON CODE IN A ```python BLOCK."
         
-        async for event in super()._run_async_impl(ctx):
-            yield event
+        try:
+            async for event in super()._run_async_impl(ctx):
+                yield event
+        finally:
+            self.instruction = original_instruction
             
         raw_result = ctx.session.state.get(self.output_key)
         if raw_result:
@@ -70,3 +72,18 @@ class SkillWriterAgent(LlmAgent):
             "Return ONLY a concise markdown list of technical insights."
         )
         super().__init__(name=name, model=model, instruction=instruction, driver=driver)
+
+    async def _run_async_impl(self, ctx: InvocationContext) -> AsyncGenerator[Event, None]:
+        logger.info(f"[{self.name}] Analyzing experiment results...")
+        
+        program_md = ctx.session.state.get("program_md", "")
+        results_tsv = ctx.session.state.get("results_tsv", "")
+        
+        original_instruction = self.instruction
+        self.instruction = f"{original_instruction}\n\nCURRENT STRATEGY:\n{program_md}\n\nLATEST RESULTS:\n{results_tsv}\n\nAnalyze the results and propose EXACTLY ONE concrete architecture change for the next loop. Use bullet points."
+        
+        try:
+            async for event in super()._run_async_impl(ctx):
+                yield event
+        finally:
+            self.instruction = original_instruction

@@ -10,7 +10,7 @@ y = np.sin(x)
 fig, ax = plt.subplots()
 
 # Plot the data
-ax.plot(x, y, label='Data')
+ax.plot(x, y, label='Data', color='gray')
 
 # Define the wave parameters
 frequency = 5
@@ -27,10 +27,10 @@ max_index = np.argmax(y)
 max_time = time[max_index]
 
 # Plot the wave
-ax.plot(time, wave, color='red', label='Wave')
+ax.plot(time, wave, color='blue', label='Wave')
 
 # Add a vertical line to highlight the peak
-ax.axvline(max_time, color='blue', linestyle='--', label='Peak')
+ax.axvline(max_time, color='red', linestyle='--', label='Peak')
 
 # Add labels and legend
 ax.set_xlabel('Time')

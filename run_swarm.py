@@ -2,6 +2,7 @@ import asyncio
 import subprocess
 import os
 import logging
+from datetime import datetime
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
@@ -10,18 +11,51 @@ from swarm.agents import ResearchAgent, SkillWriterAgent
 from swarm.drivers import ResearchProtocolDriver, SkillWriterProtocolDriver
 from swarm.coordinator import SwarmCoordinator
 
-logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
-logger = logging.getLogger(__name__)
+# ─── Logging Setup ───────────────────────────────────────────────
+# Console: INFO summary
+# swarm.log: Full structured lifecycle events
+SWARM_LOG = "/Users/surfiniaburger/Desktop/mental-research-swarm/swarm.log"
+
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.INFO)
+
+# Console handler (concise)
+console = logging.StreamHandler()
+console.setLevel(logging.INFO)
+console.setFormatter(logging.Formatter("[%(levelname)s] %(message)s"))
+root_logger.addHandler(console)
+
+# File handler (detailed, timestamped)
+file_handler = logging.FileHandler(SWARM_LOG, mode="a")
+file_handler.setLevel(logging.DEBUG)
+file_handler.setFormatter(logging.Formatter(
+    "%(asctime)s | %(levelname)-7s | %(name)-25s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+))
+root_logger.addHandler(file_handler)
+
+logger = logging.getLogger("swarm.main")
 
 REPO_PATH = "/Users/surfiniaburger/Desktop/mental-research-swarm/research_env"
 APP_NAME = "mental_research_swarm"
 USER_ID = "surfiniaburger"
 SESSION_ID = "swarm_001"
 
-async def main():
-    logger.info("🚀 Launching ADK Research Swarm")
 
-    # 1. Start MCP Server in the background
+def log_banner(msg: str):
+    """Write a visible banner to swarm.log for phase changes."""
+    border = "═" * 60
+    logger.info(border)
+    logger.info(f"  {msg}")
+    logger.info(border)
+
+
+async def main():
+    log_banner("🚀 ADK RESEARCH SWARM — SESSION START")
+    logger.info(f"Timestamp: {datetime.now().isoformat()}")
+    logger.info(f"Log file:  {SWARM_LOG}")
+
+    # 1. Start MCP Server
     logger.info("🧪 Starting Research MCP Server...")
     mcp_proc = subprocess.Popen(
         ["uv", "run", "python3", "swarm/mcp_server.py"],
@@ -34,7 +68,6 @@ async def main():
     await asyncio.sleep(2)
 
     try:
-        # 2. Local MCP Client Mock (as per ADK sample integration)
         from swarm import mcp_server
         class LocalMCPClient:
             async def call_tool(self, name, args):
@@ -45,13 +78,13 @@ async def main():
 
         mcp_client = LocalMCPClient()
 
-        # 3. Component Setup
+        # 2. Component Setup
         r_driver = ResearchProtocolDriver(mcp_client)
         sw_driver = SkillWriterProtocolDriver(mcp_client)
         
         research_agent = ResearchAgent(
             name="TheHands", 
-            model=os.environ.get("USER_LLM_MODEL", "ollama/qwen2.5-coder:1.5b"),
+            model=os.environ.get("USER_LLM_MODEL", "ollama/gemma3:1b"),
             driver=r_driver
         )
         skill_writer = SkillWriterAgent(
@@ -66,7 +99,7 @@ async def main():
             skill_writer=skill_writer
         )
 
-        # 4. ADK Runner & Session
+        # 3. ADK Runner & Session
         session_service = InMemorySessionService()
         await session_service.create_session(
             app_name=APP_NAME, 
@@ -81,15 +114,32 @@ async def main():
             session_service=session_service
         )
 
-        # 5. Execute Swarm
+        # 4. Execute Swarm with EVENT LOGGING
         content = types.Content(role='user', parts=[types.Part(text="Start autonomous research.")])
-        logger.info("🤖 Swarm session active. Monitoring loop...")
+        log_banner("🤖 SWARM SESSION ACTIVE — ENTERING EVENT LOOP")
         
+        event_count = 0
         async for event in runner.run_async(user_id=USER_ID, session_id=SESSION_ID, new_message=content):
-            # Log significant events or final response
-            pass
+            event_count += 1
+            # Log every ADK event with its author and type
+            author = getattr(event, 'author', 'unknown')
+            is_final = event.is_final_response() if hasattr(event, 'is_final_response') else False
+            
+            # Extract text content if present
+            text_preview = ""
+            if hasattr(event, 'content') and event.content and hasattr(event.content, 'parts'):
+                for part in event.content.parts:
+                    if hasattr(part, 'text') and part.text:
+                        text_preview = part.text[:120].replace('\n', ' ')
+                        break
+            
+            event_logger = logging.getLogger("swarm.events")
+            event_logger.info(
+                f"EVENT #{event_count:04d} | author={author:<20s} | "
+                f"final={is_final} | preview={text_preview or '(no text)'}"
+            )
 
-        logger.info("✅ Multi-Agent session concluded.")
+        log_banner(f"✅ SESSION COMPLETE — {event_count} events processed")
 
     finally:
         logger.info("🛑 Shutting down MCP Server...")

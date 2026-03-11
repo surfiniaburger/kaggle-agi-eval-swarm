@@ -26,6 +26,10 @@ wave = amplitude * np.sin(frequency * time + starting_point)
 max_index = np.argmax(y)
 max_time = time[max_index]
 
+# Adjust the wave position slightly below the peak
+wave_shift = 0.001  # Small value, experiment with this
+wave_shift = max_time - (y - y_max) * 0.1  # Calculate shift based on the peak position
+
 # Plot the wave
 ax.plot(time, wave, color='blue', label='Wave')
 

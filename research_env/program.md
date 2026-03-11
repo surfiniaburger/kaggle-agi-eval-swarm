@@ -115,4 +115,4 @@ As an example use case, a user might leave you running while they sleep. If each
 
 ## Research Insights
 
-- **Increase Learning Rate**: Experiment with a higher learning rate to potentially speed up convergence and improve performance.
+- Increase learning rate to 0.04

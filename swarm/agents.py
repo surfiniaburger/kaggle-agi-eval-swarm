@@ -32,11 +32,8 @@ class ResearchAgent(LlmAgent):
         program_md = ctx.session.state.get("program_md", "")
         train_py = ctx.session.state.get("train_py", "")
         
-        safe_program = program_md.replace("{", "{{").replace("}", "}}")
-        safe_train = train_py.replace("{", "{{").replace("}", "}}")
-        
         original_instruction = self.instruction
-        self.instruction = f"{original_instruction}\n\nCURRENT STRATEGY:\n{safe_program}\n\nCURRENT CODE (train.py):\n```python\n{safe_train}\n```\n\nModify the code to implement the next step in the strategy. OUTPUT ONLY THE MODIFIED FULL PYTHON CODE IN A ```python BLOCK. Do NOT output markdown outside of the code block."
+        self.instruction = f"{original_instruction}\n\nCURRENT STRATEGY:\n{{program_md}}\n\nCURRENT CODE (train.py):\n```python\n{{train_py}}\n```\n\nModify the code to implement the next step in the strategy. OUTPUT ONLY THE MODIFIED FULL PYTHON CODE IN A ```python BLOCK. Do NOT output markdown outside of the code block."
         
         raw_result = ""
         try:
@@ -89,11 +86,8 @@ class SkillWriterAgent(LlmAgent):
         program_md = ctx.session.state.get("program_md", "")
         results_tsv = ctx.session.state.get("results_tsv", "")
         
-        safe_program = program_md.replace("{", "{{").replace("}", "}}")
-        safe_results = results_tsv.replace("{", "{{").replace("}", "}}")
-        
         original_instruction = self.instruction
-        self.instruction = f"{original_instruction}\n\nCURRENT STRATEGY:\n{safe_program}\n\nLATEST RESULTS:\n{safe_results}\n\nAnalyze the results and propose EXACTLY ONE concrete architecture change for the next loop. Use bullet points."
+        self.instruction = f"{original_instruction}\n\nCURRENT STRATEGY:\n{{program_md}}\n\nLATEST RESULTS:\n{{results_tsv}}\n\nAnalyze the results and propose EXACTLY ONE concrete architecture change for the next loop. Use bullet points."
         
         raw_result = ""
         try:

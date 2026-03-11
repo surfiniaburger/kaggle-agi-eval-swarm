@@ -1,8 +1,7 @@
 import logging
 import asyncio
 from datetime import datetime
-from typing import AsyncGenerator, Any
-import ast
+from typing import AsyncGenerator
 from google.adk.agents import BaseAgent, LlmAgent
 from google.adk.agents.invocation_context import InvocationContext
 from google.adk.events import Event
@@ -96,17 +95,10 @@ class SwarmCoordinator(BaseAgent):
             # ── Step A: TheBrain analyzes and proposes ────────────
             logger.info(f"  🧠 [{self.skill_writer.name}] Analyzing results & proposing strategy...")
             
-            program_md = ctx.session.state.get("program_md", "")
-            results_tsv = ctx.session.state.get("results_tsv", "")
-            brain_msg = f"CURRENT STRATEGY:\n{program_md}\n\nLATEST RESULTS:\n{results_tsv}\n\nAnalyze the results and propose EXACTLY ONE concrete architecture change for the next loop. Use bullet points."
-            
-            brain_output = ""
-            async for event in self.skill_writer.run_async(ctx, new_message=brain_msg):
-                if hasattr(event, 'content') and event.content and hasattr(event.content, 'parts'):
-                    for part in event.content.parts:
-                        if hasattr(part, 'text') and part.text:
-                            brain_output += part.text
+            async for event in self.skill_writer.run_async(ctx):
                 yield event
+                
+            brain_output = ctx.session.state.get(self.skill_writer.output_key, "")
             if brain_output:
                 logger.info(f"  📝 TheBrain proposal: {brain_output[:150].replace(chr(10), ' ')}...")
                 # Update program.md with the new insights
@@ -122,31 +114,10 @@ class SwarmCoordinator(BaseAgent):
             # ── Step B: TheHands generates code ───────────────────
             logger.info(f"  🔧 [{self.research_agent.name}] Generating modified train.py...")
             
-            train_py = ctx.session.state.get("train_py", "")
-            hands_msg = f"CURRENT STRATEGY:\n{ctx.session.state.get('program_md', '')}\n\nCURRENT CODE (train.py):\n```python\n{train_py}\n```\n\nModify the code to implement the next step in the strategy. OUTPUT ONLY THE MODIFIED FULL PYTHON CODE IN A ```python BLOCK. Do NOT output markdown outside of the code block."
-            
-            raw_result = ""
-            async for event in self.research_agent.run_async(ctx, new_message=hands_msg):
-                if hasattr(event, 'content') and event.content and hasattr(event.content, 'parts'):
-                    for part in event.content.parts:
-                        if hasattr(part, 'text') and part.text:
-                            raw_result += part.text
+            async for event in self.research_agent.run_async(ctx):
                 yield event
             
-            validated_code = None
-            if raw_result:
-                new_code = raw_result
-                if "```python" in new_code:
-                    new_code = new_code.split("```python")[1].split("```")[0].strip()
-                elif "```" in new_code:
-                    new_code = new_code.split("```")[1].split("```")[0].strip()
-                
-                try:
-                    ast.parse(new_code)
-                    validated_code = new_code
-                except Exception as e:
-                    logger.error(f"  ⚠️ AST Validation failed: {e}")
-            
+            validated_code = ctx.session.state.get("validated_code")
             if validated_code:
                 logger.info(f"  ✅ Code validated ({len(validated_code)} chars). Writing to disk...")
                 await self.research_agent.driver.mcp.call_tool(

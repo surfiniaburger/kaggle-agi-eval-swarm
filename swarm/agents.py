@@ -26,6 +26,45 @@ class ResearchAgent(LlmAgent):
         )
         super().__init__(name=name, model=model, instruction=instruction, driver=driver)
 
+    async def _run_async_impl(self, ctx: InvocationContext) -> AsyncGenerator[Event, None]:
+        logger.info(f"[{self.name}] Beginning code modification...")
+        
+        program_md = ctx.session.state.get("program_md", "")
+        train_py = ctx.session.state.get("train_py", "")
+        
+        safe_program = program_md.replace("{", "{{").replace("}", "}}")
+        safe_train = train_py.replace("{", "{{").replace("}", "}}")
+        
+        original_instruction = self.instruction
+        self.instruction = f"{original_instruction}\n\nCURRENT STRATEGY:\n{safe_program}\n\nCURRENT CODE (train.py):\n```python\n{safe_train}\n```\n\nModify the code to implement the next step in the strategy. OUTPUT ONLY THE MODIFIED FULL PYTHON CODE IN A ```python BLOCK. Do NOT output markdown outside of the code block."
+        
+        raw_result = ""
+        try:
+            async for event in super()._run_async_impl(ctx):
+                if hasattr(event, 'content') and event.content and hasattr(event.content, 'parts'):
+                    for part in event.content.parts:
+                        if hasattr(part, 'text') and part.text:
+                            raw_result += part.text
+                yield event
+        finally:
+            self.instruction = original_instruction
+            
+        ctx.session.state[self.output_key] = raw_result
+        if raw_result:
+            new_code = raw_result
+            if "```python" in new_code:
+                new_code = new_code.split("```python")[1].split("```")[0].strip()
+            elif "```" in new_code:
+                 new_code = new_code.split("```")[1].split("```")[0].strip()
+            
+            try:
+                ast.parse(new_code)
+                ctx.session.state["validated_code"] = new_code
+                logger.info(f"[{self.name}] Code validation successful.")
+            except Exception as e:
+                logger.error(f"[{self.name}] AST Validation failed: {e}")
+                ctx.session.state["validated_code"] = None
+
 
 
 class SkillWriterAgent(LlmAgent):
@@ -43,5 +82,30 @@ class SkillWriterAgent(LlmAgent):
             "Return ONLY a concise markdown list of technical insights."
         )
         super().__init__(name=name, model=model, instruction=instruction, driver=driver)
+
+    async def _run_async_impl(self, ctx: InvocationContext) -> AsyncGenerator[Event, None]:
+        logger.info(f"[{self.name}] Analyzing experiment results...")
+        
+        program_md = ctx.session.state.get("program_md", "")
+        results_tsv = ctx.session.state.get("results_tsv", "")
+        
+        safe_program = program_md.replace("{", "{{").replace("}", "}}")
+        safe_results = results_tsv.replace("{", "{{").replace("}", "}}")
+        
+        original_instruction = self.instruction
+        self.instruction = f"{original_instruction}\n\nCURRENT STRATEGY:\n{safe_program}\n\nLATEST RESULTS:\n{safe_results}\n\nAnalyze the results and propose EXACTLY ONE concrete architecture change for the next loop. Use bullet points."
+        
+        raw_result = ""
+        try:
+            async for event in super()._run_async_impl(ctx):
+                if hasattr(event, 'content') and event.content and hasattr(event.content, 'parts'):
+                    for part in event.content.parts:
+                        if hasattr(part, 'text') and part.text:
+                            raw_result += part.text
+                yield event
+        finally:
+            self.instruction = original_instruction
+            
+        ctx.session.state[self.output_key] = raw_result
 
 

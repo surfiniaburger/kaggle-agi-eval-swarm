@@ -1,45 +1,32 @@
-import matplotlib.pyplot as plt
-import numpy as np
+def count_triangles(sides):
+    """
+    Counts the number of triangles in a given set of sides.
 
-# Define the data point
-y_max = 10
-x = np.linspace(0, 2 * np.pi, 100)
-y = np.sin(x)
+    Args:
+        sides: A list of integers representing the sides of the triangle.
 
-# Create the plot
-fig, ax = plt.subplots()
+    Returns:
+        The number of triangles that can be formed from the given sides.
+    """
+    import math
+    if len(sides) < 3:
+        return 0
+    
+    count = 0
+    for i in range(len(sides)):
+        for j in range(i + 1, len(sides)):
+            for k in range(j + 1, len(sides)):
+                a, b, c = sides[i], sides[j], sides[k]
+                if a + b > c and a + c > b and b + c > a:
+                    count += 1
+    return count
 
-# Plot the data
-ax.plot(x, y, label='Data', color='gray')
-
-# Define the wave parameters
-frequency = 5
-amplitude = 0.08
-speed = 0.05
-starting_point = 0
-
-# Generate the wave
-time = np.arange(0, 2 * np.pi, speed)
-wave = amplitude * np.sin(frequency * time + starting_point)
-
-# Find the index of the maximum value
-max_index = np.argmax(y)
-max_time = time[max_index]
-
-# Adjust the wave position slightly below the peak
-wave_shift = 0.001  # Small value, experiment with this
-wave_shift = max_time - (y - y_max) * 0.1  # Calculate shift based on the peak position
-
-# Plot the wave
-ax.plot(time, wave, color='blue', label='Wave')
-
-# Add a vertical line to highlight the peak
-ax.axvline(max_time, color='red', linestyle='--', label='Peak')
-
-# Add labels and legend
-ax.set_xlabel('Time')
-ax.set_ylabel('Value')
-ax.legend()
-
-# Show the plot
-plt.show()
+if __name__ == '__main__':
+    # Get the number of sides from the user
+    sides = int(input())
+    
+    # Calculate the number of triangles
+    num_triangles = count_triangles(sides)
+    
+    # Print the result
+    print(num_triangles)

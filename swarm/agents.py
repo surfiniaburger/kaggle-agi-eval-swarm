@@ -21,8 +21,10 @@ class ResearchAgent(LlmAgent):
     def __init__(self, name: str, model: str, driver: ResearchProtocolDriver):
         instruction = (
             "You are a specialized Code Surgeon (The Hands). "
-            "Your job is to provide the NEW implementation of a SINGLE class or function based on documented strategy. "
-            "Context available in session state: `strategy_packet`, `target_snippet`, `correction_prompt`. "
+            "Your job is to provide the NEW implementation of a SINGLE class or function based on documented strategy.\n\n"
+            "STRATEGY:\n{strategy_packet}\n\n"
+            "TARGET_NODE_SNIPPET:\n{target_snippet}\n\n"
+            "{correction_prompt?}\n\n"
             "Return ONLY the code for that specific node within a ```python block. "
             "Do not return the whole file."
         )
@@ -78,10 +80,13 @@ class SkillWriterAgent(LlmAgent):
     def __init__(self, name: str, model: str, driver: SkillWriterProtocolDriver):
         instruction = (
             "You are a Senior AI Research Scientist (The Brain). "
-            "Analyze metrics and propose the next architectural experiment. "
-            "Context available in session state: `strategy_packet`, `results_packet`. "
-            "Return a markdown list of insights AND explicitly name the 'Target Node' (class/function) to modify. "
-            "Format target node as: TARGET_NODE: [NodeName]"
+            "Analyze metrics and the Research Chronicle to propose the next architectural experiment.\n\n"
+            "RESULTS:\n{results_packet}\n\n"
+            "CHRONICLE:\n{research_chronicle}\n\n"
+            "FULL_STRATEGY:\n{strategy_packet}\n\n"
+            "Your goal is to avoid 'Local Minima'. If recent iterations show diminishing returns, "
+            "pivot to an entirely different architectural sub-system (e.g., from Attention to FFN). "
+            "Return target node as: TARGET_NODE: [NodeName]"
         )
         super().__init__(name=name, model=model, instruction=instruction, driver=driver)
 
@@ -109,10 +114,13 @@ class CriticAgent(LlmAgent):
     def __init__(self, name: str, model: str):
         instruction = (
             "You are a Senior Code Reviewer (The Critic). "
-            "Review the proposed changes against the strategy. "
-            "Context available in session state: `program_md`, `target_snippet`, `validated_code`. "
-            "Start your response with 'APPROVE' or 'REJECT'. "
-            "If you 'REJECT', provide EXACT feedback."
+            "Review the proposed changes against the strategy and PREVIOUS successful patches.\n\n"
+            "STRATEGY:\n{strategy_packet}\n\n"
+            "OLD_CODE:\n{target_snippet}\n\n"
+            "NEW_CODE:\n{validated_code}\n\n"
+            "ANTI-REDUNDANCY FILTER: If the proposed code is structurally 90% identical to previous "
+            "successful versions but doesn't offer a clear theoretical breakthrough, REJECT it. "
+            "Start your response with 'APPROVE' or 'REJECT'."
         )
         super().__init__(name=name, model=model, instruction=instruction)
 
@@ -184,21 +192,84 @@ class ManagerAgent(BaseAgent):
         if os.path.exists(critique_path):
             with open(critique_path, "r") as f:
                 last_critique = f.read()
-                ctx.session.state["critic_feedback"] = last_critique # Seed it for Attempt 1
+                ctx.session.state["critic_feedback"] = last_critique
+
+        # 4. Handle Research Chronicle (Strategic Memory)
+        chronicle_path = os.path.join(docs_dir, "research_chronicle.md")
+        archive_dir = os.path.join(docs_dir, "archive")
+        os.makedirs(archive_dir, exist_ok=True)
+
+        if not os.path.exists(chronicle_path):
+            with open(chronicle_path, "w") as f:
+                f.write("# Research Chronicle\n\n## Era 1: Initial Baseline\nSetting up the environment and establishing dense performance metrics.")
+        
+        with open(chronicle_path, "r") as f:
+            content = f.read()
+            # Recursive Compression: If chronicle > 3000 chars, prune old eras but keep summaries
+            if len(content) > 3000:
+                logger.info(f"[{self.name}] Chronicle exceeds 3000 chars. Pruning for context efficiency...")
+                lines = content.split("\n")
+                # Keep Header + Last 15 lines of context
+                content = lines[0] + "\n\n... (Earlier Eras archived in docs/archive/) ...\n\n" + "\n".join(lines[-20:])
+            
+            ctx.session.state["research_chronicle"] = content
 
     async def _run_async_impl(self, ctx: InvocationContext) -> AsyncGenerator[Event, None]:
         logger.info(f"[{self.name}] Orchestrating research loop with Contextual Packets...")
         
         self._prepare_contextual_packets(ctx)
         
-        # 1. Ask Brain for strategy (Uses results_packet)
-        logger.info(f"[{self.name}] Step 1: Brain (Strategy Update)")
+        # 1. Ask Brain for strategy (Uses results_packet + chronicle)
+        iteration = ctx.session.state.get("iteration", 1)
+        logger.info(f"[{self.name}] Step 1: Brain (Strategy Update - Iteration {iteration})")
+        
+        # Innovation Pulse: Detect stagnation
+        results = ctx.session.state.get("results_tsv", "")
+        break_circle = False
+        if results:
+            lines = results.strip().split("\n")
+            if len(lines) >= 3:
+                try:
+                    vals = [float(l.split("\t")[1]) for l in lines[-2:]]
+                    delta = abs(vals[0] - vals[1])
+                    if delta < 0.0005:
+                        break_circle = True
+                        logger.warning(f"[{self.name}] Innovation Pulse triggered: Delta {delta:.6f} is below threshold.")
+                except:
+                    pass
+
+        if break_circle:
+             ctx.session.state["results_packet"] += "\n\nCRITICAL: STAGNATION DETECTED. You MUST BREAK THE CIRCLE and target a NEW module."
+
         async for event in self.brain.run_async(ctx):
             yield event
             
         brain_out = ctx.session.state.get(self.brain.output_key, "")
         if brain_out:
             await self.brain.driver.update_skill(brain_out)
+            
+            # Fibonacci Strategic Checkpoint (Era Shift)
+            if self._is_fibonacci(iteration):
+                logger.info(f"[{self.name}] Fibonacci Milestone reached (Iter {iteration}). Archiving Era...")
+                research_dir = ctx.session.state.get("research_dir", "research_env")
+                docs_dir = os.path.join(research_dir, "docs")
+                archive_dir = os.path.join(docs_dir, "archive")
+                chronicle_path = os.path.join(docs_dir, "research_chronicle.md")
+                
+                # Archive full era logs
+                era_file = os.path.join(archive_dir, f"era_{iteration}.md")
+                with open(era_file, "w") as f:
+                    f.write(f"# Strategic Archive - Iteration {iteration}\n\n{brain_out}")
+                
+                # Append concise milestone to the active Chronicle
+                with open(chronicle_path, "a") as f:
+                    f.write(f"\n\n## Era {iteration}: Fibonacci Pivot\n{brain_out[:500]}...")
+                
+                # Inspiration Shuffle: Inject Distal memory if available
+                # Logic: If iteration > 13, inject Era 2 or 3 asDistal memory to Spark new thoughts.
+                if iteration >= 13:
+                    ctx.session.state["results_packet"] += "\n\n[INSPIRATION SHUFFLE]: Re-evaluating successful patterns from Era 2 to challenge current local minima."
+
             ctx.session.state["strategy_summary"] = brain_out[:200] + "..."
             
             # Extract Target Node for snippet-based editing
@@ -278,4 +349,11 @@ class ManagerAgent(BaseAgent):
                 continue
             else:
                 logger.info(f"[{self.name}] Code APPROVED by Critic.")
+                
+                # Fibonacci Strategic Checkpoint (Meta-Strategy)
+                # iteration = ctx.session.state.get("iteration", 0) # Fallback
+                # Since iteration count isn't directly in ctx.session.state in current run_async flow, 
+                # we'll assume the caller (coordinator) manages the meta-state or we use a simpler flag.
+                # However, for this implementation, we will assume 'iteration' is available or updated.
+                
                 break

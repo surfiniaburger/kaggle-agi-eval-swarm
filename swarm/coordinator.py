@@ -102,8 +102,22 @@ class SwarmCoordinator(BaseAgent):
                 # ── Steps A, B, C: Hierarchical Management ────────────
                 logger.info(f"  🏢 [{self.manager_agent.name}] Delegating iteration tasks...")
                 
-                async for event in self.manager_agent.run_async(ctx):
-                    yield event
+                max_retries = 3
+                current_retry = 0
+                while current_retry < max_retries:
+                    try:
+                        async for event in self.manager_agent.run_async(ctx):
+                            yield event
+                        break # Success
+                    except Exception as e:
+                        if "Timeout" in str(e) or "APIConnectionError" in str(e):
+                            current_retry += 1
+                            wait_time = 2 ** current_retry
+                            logger.warning(f"  ⚠️ Timeout detected ({e}). Retry {current_retry}/{max_retries} in {wait_time}s...")
+                            import asyncio
+                            await asyncio.sleep(wait_time)
+                        else:
+                            raise e
                 
                 # Check for results after management orchestration
                 validated_code = ctx.session.state.get("validated_code")

@@ -149,6 +149,10 @@ class ManagerAgent(BaseAgent):
             hands=hands,
             critic=critic
         )
+        self._fibonacci_cache = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144]
+
+    def _is_fibonacci(self, n: int) -> bool:
+        return n in self._fibonacci_cache
 
     def _prepare_contextual_packets(self, ctx: InvocationContext):
         """Summarizes full files into contextual packets and writes to docs/."""

@@ -20,6 +20,8 @@ To ensure "Pure Exploration" and high-fidelity results, we have implemented seve
 - **📉 Stagnation Annealing**: If `val_bpb` delta is $< 0.005$ over 3 iterations, the Manager wipes the current critique and "Hard Prunes" the chronicle to force a strategic pivot.
 - **🌀 Fibonacci Strategic Memory**: Major architectural changes are archived every $1, 2, 3, 5, 8, 13...$ iterations, creating a persistent "Era" history that guides the Brain without overloading its context window.
 - **🛡️ Anti-Roleplay Hardening**: Agents are strictly forbidden from "Status Roleplay" (like "Command Center Received") or intentional crash states, focusing purely on Python implementation.
+- **🚑 Crash Feedback Loop**: When an LLM writes syntactic garbage or incompatible tensor shapes, the Swarm does not silently loop. It captures the raw Python traceback of the crash (suppressing package manager noise via `uv run -q`) and immediately injects it into the Brain's context. This turns failed experiments into targeted self-debugging.
+- **🔀 Strategy Diversifier**: A mid-level interceptor that tracks the lineage of research strategies (e.g., loss, architecture, data). If the Brain fixates on the same axis for too long (tunnel vision), the Diversifier rejects the proposal and forces the Brain to explore a fundamentally different component.
 
 ---
 

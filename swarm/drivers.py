@@ -89,7 +89,7 @@ class ResearchProtocolDriver:
         })
 
         await self.mcp.call_tool("execute_command", {
-            "command": "uv run train.py > run.log 2>&1",
+            "command": "uv run -q train.py > run.log 2>&1",
             "cwd": self.repo_path,
             "timeout": 1200
         })

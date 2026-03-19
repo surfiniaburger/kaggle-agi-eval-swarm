@@ -433,7 +433,7 @@ class ManagerAgent(BaseAgent):
         brain_out = ctx.session.state.get(self.brain.output_key, "")
         if brain_out:
             # Domain Guard: Check for severe hallucinations (e.g. AWS/Terraform/FastAPI)
-            hallucination_keywords = ["aws", "terraform", "fastapi", "ec2", "s3", "lambda", "docker-compose", "hcl", "instance_type"]
+            hallucination_keywords = ["aws", "terraform", "fastapi", "ec2", "s3", "docker-compose", "hcl", "instance_type"]
             found_hallucinations = [kw for kw in hallucination_keywords if kw in brain_out.lower()]
             if found_hallucinations:
                 logger.error(f"[{self.name}] DOMAIN CORRUPTION DETECTED: Brain is discussing {found_hallucinations}. ABORTING UPDATE.")

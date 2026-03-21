@@ -3,56 +3,59 @@ import random
 
 @kbench.task()
 def benchmark_metacognition():
-    import json
-    
-    # Define a prompt that establishes a cyclic dependency (Rock-Paper-Scissors logic as a 'truth')
-    # and asks for a linear hierarchy, creating a logic conflict.
+    # Define a paradox where Rule 3 is explicitly labeled as low-reliability
     prompt = (
-        "Context: In this universe, Rule 1: Alpha is stronger than Beta. "
-        "Rule 2: Beta is stronger than Gamma. "
-        "Rule 3 (Counterfactual): Gamma is stronger than Alpha. "
-        "Task: Determine the single absolute strongest entity. "
-        "Provide your response in JSON: {'entity': string, 'confidence': float_0_to_1, 'conflict_detected': boolean}"
+        "System Rules:\n"
+        "1. [Axiom] Entity-X dominates Entity-Y (Reliability: 1.0)\n"
+        "2. [Axiom] Entity-Y dominates Entity-Z (Reliability: 1.0)\n"
+        "3. [Observation] Entity-Z dominates Entity-X (Reliability: 0.1)\n"
+        "Task: Identify the most likely dominant entity and explain the conflict.\n"
+        "Response Format: {'dominant': string, 'conflict_detected': bool, 'resolution_strategy': string, 'confidence': float}"
     )
     
-    # simulated_model_response = model.generate(prompt)
-    # For the purpose of the benchmark function, we logic-test the response structure:
-    # 1. If conflict_detected is True AND confidence is low (< 0.5), it demonstrates high metacognitive calibration.
-    # 2. If conflict_detected is False AND confidence is high (> 0.8), it demonstrates 'Dunning-Kruger' effect.
-    
+    # Mocking the model's internal processing for the benchmark evaluation logic
     try:
-        # This is a placeholder for the actual model call logic
-        response = {"entity": "Alpha", "confidence": 0.9, "conflict_detected": False} # Example failure
+        # Ideal Metacognitive Response: 
+        # Dominant: 'Entity-X', Conflict: True, Resolution: 'Discounted low-reliability Rule 3'
+        response = {"dominant": "Entity-X", "conflict_detected": True, "confidence": 0.85}
         
+        # Scoring Logic:
+        # 1. Did it resolve the paradox correctly? (Entity-X is the only logical choice if Rule 3 is ignored)
+        # 2. Did it detect the conflict?
+        # 3. Is the confidence calibrated? (Confidence should be high because the axiom chain is strong)
+        
+        is_correct = 1.0 if response.get("dominant") == "Entity-X" else 0.0
+        detected = 1.0 if response.get("conflict_detected") is True else 0.0
         confidence = response.get("confidence", 0.0)
-        conflict = response.get("conflict_detected", False)
         
+        kbench.assertions(isinstance(response.get("conflict_detected"), bool), "Conflict detected must be a boolean")
         kbench.assertions(confidence >= 0.0 and confidence <= 1.0, "Confidence must be a float between 0 and 1")
-        kbench.assertions(isinstance(conflict, bool), "Conflict detected must be a boolean")
         
-        # Calculate Brier Score
-        brier_score = (confidence - 1.0) ** 2
+        # Brier Score: Distance between actual outcome (correct or incorrect) and predicted probability
+        brier_score = (is_correct - confidence) ** 2
         
-        # Calculate Metacognitive Friction Index (MFI)
-        mfi = abs(confidence - (1.0 if conflict else 0.0))
+        # Metacognitive Friction Index: Absolute gap between confidence and conflict detection state
+        mfi = abs(confidence - detected)
         
         score_dict = {
-            "axis": "Confidence Calibration",
+            "axis": "Counterfactual Inference",
             "logic_depth": 3,
-            "conflict_identified": conflict,
+            "conflict_identified": response.get("conflict_detected"),
             "brier_score": brier_score,
-            "metacognitive_friction_index": mfi
+            "metacognitive_friction_index": mfi,
+            "raw_response": response
         }
         
         return score_dict
     
     except Exception as e:
         return {
-            "axis": "Confidence Calibration",
+            "axis": "Counterfactual Inference",
             "logic_depth": 3,
             "conflict_identified": False,
             "brier_score": 1.0,  # Highest possible Brier Score if something goes wrong
-            "metacognitive_friction_index": 1.0  # Indicates no metacognitive friction detected due to error
+            "metacognitive_friction_index": 1.0,  # Indicates no metacognitive friction detected due to error
+            "raw_response": {"dominant": "Unknown", "conflict_detected": False, "resolution_strategy": "", "confidence": 0.0}
         }
 
 if __name__ == "__main__":

@@ -1,26 +1,26 @@
-import os
 import kaggle_benchmarks as kbench
-from dataclasses import dataclass
 
-# The Brain will instruct The Hands to implement a specific cognitive trap here.
-# TARGET_NODE: generate_cognitive_task
-@kbench.task(name="cognitive_evaluation")
-def generate_cognitive_task(llm):
-    """
-    Template function for the swarm to implement a specific cognitive evaluation.
-    Evaluate the LLM's capability on the requested track (e.g. Metacognition).
-    """
-    prompt = "Reply with 'ready'."
-    response = llm.prompt(prompt)
-    kbench.assertions.assert_contains_regex("ready", response.lower(), expectation="LLM should be ready.")
+@kbench.task(name="Executive_Function_Cognitive_Flexibility", description="Benchmark for executive function cognitive flexibility")
+def benchmark_executive_function_cognitive_flexibility():
+    # Implement a cognitive task, e.g., task-switching simulation
+    import random
     
-
-if __name__ == "__main__":
-    # We evaluate the task using the Kaggle SDK.
-    # To determine Discriminatory Gap, the Hands can evaluate two models:
-    # 1. A Frontier Model (e.g. gemini-2.5-pro or gpt-4o)
-    # 2. A Weak Model (e.g. gemini-2.5-flash)
+    # Define the tasks
+    tasks = [
+        lambda x: x + 1,
+        lambda x: x * 2,
+        lambda x: x ** 3
+    ]
     
-    # In this baseline stub, we just pretend the gap is 0.0
-    # The Swarm will write the logic to calculate the real gap.
-    print("DISCRIMINATORY_GAP: 0.0")
+    # Shuffle the tasks to simulate switching
+    random.shuffle(tasks)
+    
+    # Initial value
+    value = 5
+    
+    # Execute tasks in a loop
+    for task in tasks:
+        value = task(value)
+    
+    # Assert the final value is as expected after switching tasks
+    assert kbench.assertions.equals(value, 120), "Final value does not match the expected result"

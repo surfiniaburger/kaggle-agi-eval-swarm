@@ -1,0 +1,5 @@
+{
+  "versionNumber": 1,
+  "name": "ToM_Mental_Time_Travel",
+  "definition": "@kbench.task(name=\"ToM_Mental_Time_Travel\")\ndef benchmark_tom_mental_time_travel():\n    # Placeholder for actual implementation of the 'ToM Mental Time Travel' task\n    pass  # Placeholder for actual implementation\n"
+}

@@ -3,7 +3,7 @@ name = "autoresearch"
 version = "0.1.0"
 description = "Autonomous pretraining research swarm"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "matplotlib>=3.10.8",
     "numpy>=2.2.6",
@@ -13,6 +13,8 @@ dependencies = [
     "rustbpe>=0.1.0",
     "tiktoken>=0.11.0",
     "torch==2.6.0",
+    "kaggle-benchmarks @ file:///Users/surfiniaburger/Desktop/kaggle-agi-eval-swarm/kaggle-benchmarks",
+    "hishel>1.1.8",
 ]
 
 

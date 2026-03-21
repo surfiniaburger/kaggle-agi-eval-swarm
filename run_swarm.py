@@ -14,7 +14,8 @@ from swarm.coordinator import SwarmCoordinator
 # ─── Logging Setup ───────────────────────────────────────────────
 # Console: INFO summary
 # swarm.log: Full structured lifecycle events
-SWARM_LOG = "/Users/surfiniaburger/Desktop/mental-research-swarm/swarm.log"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SWARM_LOG = os.path.join(BASE_DIR, "swarm.log")
 
 root_logger = logging.getLogger()
 root_logger.setLevel(logging.INFO)
@@ -36,7 +37,7 @@ root_logger.addHandler(file_handler)
 
 logger = logging.getLogger("swarm.main")
 
-REPO_PATH = "/Users/surfiniaburger/Desktop/mental-research-swarm/research_env"
+REPO_PATH = os.path.join(BASE_DIR, "research_env")
 APP_NAME = "mental_research_swarm"
 USER_ID = "surfiniaburger"
 SESSION_ID = "swarm_001"
@@ -59,7 +60,8 @@ async def main():
     logger.info("🧪 Starting Research MCP Server...")
     mcp_proc = subprocess.Popen(
         ["uv", "run", "python3", "swarm/mcp_server.py"],
-        cwd="/Users/surfiniaburger/Desktop/mental-research-swarm",
+        env={**os.environ, "SAFE_REPO_PATH": REPO_PATH},
+        cwd=BASE_DIR,
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -85,7 +87,7 @@ async def main():
         
         # Pull model overrides from env or use Qwen 3.5 defaults
         MODEL_BRAIN = os.environ.get("BRAIN_MODEL", "ollama/qwen3.5:9b")
-        MODEL_MANAGER = os.environ.get("MANAGER_MODEL", "ollama/qwen3.5:9b")
+        MODEL_MANAGER = os.environ.get("MANAGER_MODEL", "ollama/qwen2.5-coder:7b")
         MODEL_HANDS = os.environ.get("HANDS_MODEL", "ollama/qwen2.5-coder:7b")
         MODEL_CRITIC = os.environ.get("CRITIC_MODEL", "ollama/qwen3.5:9b")
 
@@ -113,7 +115,8 @@ async def main():
         
         coordinator = SwarmCoordinator(
             name="SwarmCoordinator",
-            manager_agent=manager_agent
+            manager_agent=manager_agent,
+            max_iterations=30
         )
 
         # 3. ADK Runner & Session
@@ -122,7 +125,13 @@ async def main():
             app_name=APP_NAME, 
             user_id=USER_ID, 
             session_id=SESSION_ID,
-            state={"topic": "Optimize 11M parameter TinyLlama BPB"}
+            state={
+                "topic": "Generate and Evaluate AGI Benchmarks (Kaggle)",
+                "benchmark_py": open(os.path.join(BASE_DIR, "research_env/benchmark.py")).read() if os.path.exists(os.path.join(BASE_DIR, "research_env/benchmark.py")) else "",
+                "results_packet": "No iterations completed yet. Starting from baseline.",
+                "strategy_packet": "Establish a stable Metacognitive baseline. Drill deep into the 5 metacognitive sub-levels (calibration, error monitoring, etc.). Do not explore general cognition.",
+                "crash_feedback": "None"
+            }
         )
         
         runner = Runner(

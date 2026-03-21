@@ -1,0 +1,62 @@
+[
+  {
+    "val_score": 100.0,
+    "peak_vram_gb": 0.0,
+    "status": "keep",
+    "description": "Benchmark run"
+  },
+  {
+    "val_score": 100.0,
+    "peak_vram_gb": 0.0,
+    "status": "keep",
+    "description": "Benchmark run"
+  },
+  {
+    "val_score": 100.0,
+    "peak_vram_gb": 0.0,
+    "status": "keep",
+    "description": "Benchmark run"
+  },
+  {
+    "val_score": 0.0,
+    "peak_vram_gb": 0.0,
+    "status": "keep",
+    "description": "Benchmark run"
+  },
+  {
+    "val_score": 0.0,
+    "peak_vram_gb": 0.0,
+    "status": "crash",
+    "description": "Benchmark run"
+  },
+  {
+    "val_score": 0.0,
+    "peak_vram_gb": 0.0,
+    "status": "crash",
+    "description": "Benchmark run"
+  },
+  {
+    "val_score": 0.0,
+    "peak_vram_gb": 0.0,
+    "status": "crash",
+    "description": "Benchmark run"
+  },
+  {
+    "val_score": 0.0,
+    "peak_vram_gb": 0.0,
+    "status": "keep",
+    "description": "Benchmark run"
+  },
+  {
+    "val_score": 0.0,
+    "peak_vram_gb": 0.0,
+    "status": "keep",
+    "description": "Benchmark run"
+  },
+  {
+    "val_score": 0.0,
+    "peak_vram_gb": 0.0,
+    "status": "keep",
+    "description": "Benchmark run"
+  }
+]

@@ -1,22 +1,42 @@
 REJECT
 
-### Feedback for Code Improvement (Round 5)
+Target node: TARGET_NODE: benchmark_metacognition
 
-The current implementation in `prefill` and `decode` exhibits critical logic flaws and memory allocation issues that violate the requirements for sparse MoE routing.
+### Critique
+The implementation at `benchmark_metacognition` contains critical logic flaws that invalidate the benchmark's ability to assess metacognitive depth.
+- **Hardcoded Validation:** The code generates a response using `model.generate` but then hardcodes `pass: False` and a static `reasoning_trace`. This fails to actually validate the response content.
+- **Missing Analysis:** The code does not parse `model_response` for signs of successful metacognitive handling (e.g., acknowledging constraints, re-evaluating reasoning).
+- **Incorrect Assertions:** The `kbench.assertions` call uses the hardcoded `False`, ensuring the benchmark will always fail, which does not test the model's actual performance or the benchmark's scaling depth.
 
-**1. Critical Shape Mismatch in `create_mask`:**
-   - **Bug:** In `create_mask`, `mask = torch.zeros((batch_size, seq_len), dtype=torch.long)` allocates a 2D tensor expecting one value per token position. However, `ids` (result of `torch.topk`) has shape `(num_tokens, capacity)`. The loop `for i, ids in enumerate(expert_ids): mask[i, torch.arange(seq_len)] = ids` attempts to assign a list of length `capacity` into a row of length `seq_len`.
-   - **Impact:** If `capacity > 1` (typical for MoE), this assignment fails with a runtime shape mismatch error or silently truncates data. This contradicts the Top-K routing requirement where multiple experts can be active per token. The current logic assumes a dense mapping of (token, expert) to a single integer index, which is semantically incorrect for sparse loading unless specifically unrolled into flat indices `(batch * seq_len, num_capacity)`.
+### Fix
+We must modify the node to dynamically evaluate the model's response.
+1.  Analyze `model_response` for keywords indicating conflict resolution or depth (e.g., "conflict", "re-evaluate").
+2.  Dynamically determine the `pass` status and construct the `reasoning_trace` based on the model's actual output.
+3.  Ensure the result is computed correctly before passing to `kbench.assertions`.
 
-**2. Incorrect Mask Semantics:**
-   - **Requirement:** The system needs to track active experts and their weights efficiently. The current code tries to use `mask` as a container for expert IDs but fails to return the correct structure for downstream scatter operations (which expect either `(ids, counts)` or a specific sparse format).
-   - **Fix Needed:** Instead of forcing a mismatch into a `(B, S)` tensor, route logic should flatten the expert indices and corresponding gate weights to a single vector or return a structured list that supports ragged loading. A dense mask shape `(B, S, E)` is discouraged, but `ids` should be handled as a flat list of `(batch, seq_len, capacity)` which can then be flattened to `(total_tokens, capacity)`. The current implementation breaks this contract.
+### Corrected Code Snippet
+```python
+from kbench import kbench
+import regex
 
-**3. Unused Parameter & Optimization:**
-   - **Issue:** The function arguments include `stage_type`, but neither the routing nor the weight access logic differentiates between Prefill and Decode. In a typical MoE setup, weights for the router should be cached or handled differently during decoding to avoid recomputation overhead. While simple, the lack of distinct handling suggests the implementation is not optimized for the full lifecycle of the inference stage as implied by the presence of `stage_type`.
+@kbench.step("benchmark_metacognition")
+def benchmark_metacognition(task_id, prompt, model, model_response):
+    # Analyze the model response for metacognitive traits
+    # Check if the response acknowledges the conflict or re-evaluates reasoning
+    analysis = model_response
+    if "conflict" in analysis.lower() or "re-evaluate" in analysis.lower():
+        pass_status = True
+        reasoning_trace = "Model correctly identified and handled the conflicting instructions by prioritizing the explicit constraints."
+    else:
+        pass_status = False
+        reasoning_trace = "Model failed to address the conflicting instructions in the expected manner."
 
-**4. Memory Allocation Strategy:**
-   - **Constraint:** The code allocates a dense `(batch_size, seq_len)` mask for storing IDs. While this is technically `(B, S)`, it enforces a rigid shape on data that should be ragged or list-based per token (if capacity varies). To align with the "avoid dense matrices per token" spirit (implied by `expert_capacity` and Top-K), the code should utilize PyTorch's advanced indexing or flat buffers to store `(id, weight)` pairs without row-wise shape constraints.
+    # Prepare the assertions for kbench
+    # Pass the computed result dynamically
+    result = pass_status
 
-**Summary:**
-The implementation currently contains a fatal logic error regarding tensor shapes for top-k selection. It does not correctly support multi-expert routing per token (Top-K > 1) due to the assignment mismatch in `create_mask`. Please refactor the mask creation and data structure handling to support `(batch, seq_len, capacity)` flat indices or lists before returning to downstream scatter operations.
+    # Call the assertions with the computed result
+    return kbench.assertions(expected_output=result, reasoning=reasoning_trace, reasoning_trace=reasoning_trace)
+```
+
+[TARGET_NODE]: benchmark_metacognition

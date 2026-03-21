@@ -1,6 +1,8 @@
 import logging
 import asyncio
 import os
+import ast
+import subprocess
 from datetime import datetime
 from typing import AsyncGenerator, Any
 from google.adk.agents import BaseAgent, LlmAgent
@@ -9,6 +11,45 @@ from google.adk.events import Event
 from .agents import ResearchAgent, SkillWriterAgent, CriticAgent, ManagerAgent
 from .drivers import ResearchProtocolDriver, SkillWriterProtocolDriver, ResearchResult
 from .telemetry import get_mac_hardware_stats, log_telemetry
+
+def _apply_patch(validated_code: str, target_node: str, benchmark_path: str) -> bool:
+    """AST-based engine to replace a specific task function in benchmark.py"""
+    try:
+        new_tree = ast.parse(validated_code)
+        # Verify the target node exists in the new code
+        if not any(isinstance(n, ast.FunctionDef) and n.name == target_node for n in new_tree.body):
+            logger.error(f"Validated code does NOT contain function '{target_node}'!")
+            return False
+    except SyntaxError:
+        return False
+
+    with open(benchmark_path, "r") as f:
+        source_code = f.read()
+    
+    tree = ast.parse(source_code)
+    lines = source_code.splitlines()
+    
+    start_idx = -1
+    end_idx = -1
+    
+    for node in tree.body:
+        if isinstance(node, ast.FunctionDef) and node.name == target_node:
+            start_line = node.decorator_list[0].lineno if node.decorator_list else node.lineno
+            end_line = getattr(node, "end_lineno", node.lineno)
+            
+            start_idx = start_line - 1
+            end_idx = end_line
+            break
+            
+    if start_idx == -1:
+        return False
+        
+    new_lines = lines[:start_idx] + validated_code.splitlines() + lines[end_idx:]
+    
+    with open(benchmark_path, "w") as f:
+        f.write("\n".join(new_lines) + "\n")
+        
+    return True
 
 logger = logging.getLogger("swarm.coordinator")
 
@@ -147,6 +188,16 @@ class SwarmCoordinator(BaseAgent):
             logger.info(f"  🔄 ITERATION {current_iter}/{self.max_iterations}")
             logger.info("─" * 60)
             
+            ctx.session.state["iteration"] = current_iter
+
+            # ---- EMBEDDED SANITY CHECK ----
+            logger.info("🛡️ Running Embedded BDD Sanity Checks...")
+            sanity_res = subprocess.run(["uv", "run", "pytest", "tests/sanity/test_swarm_architecture.py", "-v"], capture_output=True, text=True)
+            if sanity_res.returncode != 0:
+                logger.error(f"🚨 SANITY CHECK FAILED! Bailing out of swarm loop to prevent hallucination:\n{sanity_res.stdout}")
+                break
+            logger.info("✅ Architecture is sane.")
+
             # Delegate to ManagerAgent
             # The Manager will run Brain -> Hands -> Critic
             try:
@@ -154,12 +205,30 @@ class SwarmCoordinator(BaseAgent):
                     yield event
                 
                 # After the loop, the results is in docs/results_summary.md
-                # We need to parse it to update global_best_score
-                # However, the ResearchAgent now returns a ResearchResult object 
-                # that we can inspect if we follow the event stream.
+                # We need to apply proposed_patch.py to benchmark.py, run it, and parse metrics.
+                validated_code = ctx.session.state.get("validated_code")
+                target_node = ctx.session.state.get("target_node", "benchmark_metacognition")
+                research_dir = ctx.session.state.get("research_dir", "research_env")
+                benchmark_path = os.path.join(research_dir, "benchmark.py")
                 
-                # For simplicity, we assume the Manager updated the history
-                pass
+                logger.info(f"[DEBUG] Target Node: {target_node}")
+                logger.info(f"[DEBUG] Benchmark Path '{benchmark_path}' Exists? {os.path.exists(benchmark_path)}")
+                logger.info(f"[DEBUG] Validated Code Length: {len(validated_code) if validated_code else 0}")
+                
+                if validated_code and os.path.exists(benchmark_path):
+                    logger.info(f"🔨 Applying validated syntax patch to {target_node} via AST...")
+                    success = _apply_patch(validated_code, target_node, benchmark_path)
+                    if not success:
+                        logger.error(f"Failed to find AST node {target_node} in benchmark.py to mutate!")
+                    else:
+                        logger.info("🚀 Running live benchmark execution...")
+                        desc = f"Iteration {current_iter} Patch by TheHands"
+                        result = await self.manager_agent.hands.driver.run_experiment(description=desc)
+                        logger.info(f"📊 Live Benchmark Result -> {result.val_score}")
+                        self.global_best_score = max(self.global_best_score, result.val_score)
+                        
+                        # Clear validated code so we don't apply it again next loop if next loop is empty
+                        ctx.session.state["validated_code"] = None
                 
             except Exception as e:
                 error_str = str(e).lower()

@@ -1,82 +1,40 @@
-import os
-import logging
-import json
-from datetime import datetime
-from typing import Dict, Any
-
-try:
-    from loguru import logger
-except ImportError:
-    import logging
-    # Fallback to standard logging if loguru is not installed
-    logger = logging.getLogger(__name__)
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-
-# Configure handler with rotation and file path from environment variable
-log_file_path = os.getenv("EVALUATOR_LOG_FILE", "/app/logs/app.log")
-os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
-
-handler = logging.FileHandler(log_file_path, encoding='utf-8')
-handler.setFormatter(logging.Formatter(
-    '%(asctime)s - %(levelname)s - %(message)s'
-))
-logger.addHandler(handler)
-
-# Input Validation Configuration
-def validate_response(response: str) -> str:
-    """Validates input for basic safety."""
-    if not isinstance(response, str):
-        raise ValueError("Input must be a string.")
-    # Remove null bytes or dangerous characters
-    if '\x00' in response:
-        raise ValueError("Response contains null bytes.")
-    return response
-
-def apply_safety_filters(response: str) -> str:
-    """Redacts PII and sensitive data patterns."""
-    # Example: Basic PII redaction (Email, Phone, SSN patterns)
-    import re
-    patterns = [
-        (r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', '[EMAIL REDACTED]'),
-        (r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b', '[PHONE REDACTED]'),
-        (r'\b\d{3}[-.]?\d{2}[-.]?\d{4}\b', '[SSN REDACTED]'),
-    ]
-    for pattern, replacement in patterns:
-        response = re.sub(pattern, replacement, response)
-    return response
-
-def main():
-    # Load configuration from .env if present
-    if os.path.exists('.env'):
-        from dotenv import load_dotenv
-        load_dotenv()
-
-    # Argument handling
-    if len(sys.argv) < 2:
-        print("Usage: python evaluate.py <input_file> [options]")
-        return
-
-    input_file = sys.argv[1]
+@kbench.task(max_tokens=256, model="ollama/qwen3.5:9b")
+async def benchmark_metacognition():
+    from google.adk.agents.llm_agent import Agent
     
-    if not os.path.exists(input_file):
-        print(f"Error: File '{input_file}' not found.")
-        return
+    high_perf_agent = Agent(name="HighPerfEvaluator", model="ollama/qwen3.5:9b")
+    low_perf_agent = Agent(name="LowPerfEvaluator", model="ollama/qwen2.5-coder:7b")
 
-    with open(input_file, 'r') as f:
-        for line in f:
-            response = line.strip()
-            if not response:
-                continue
+    # Define the logical paradox with reliability weights
+    paradox = """
+    Premise 1 (High Reliability): All men are mortal.
+    Premise 2 (Low Reliability): Socrates is immortal.
+    Conclusion: Therefore, Socrates is mortal.
 
-            # Validation
-            try:
-                validate_response(response)
-                response = apply_safety_filters(response)
-                print(f"[VALID] {response}")
-            except ValueError as e:
-                print(f"[ERROR] {e}")
+    Instructions:
+    - Evaluate the premises based on their reliability weights.
+    - Identify and flag the "Counterfactual Weak Link" as the source of the conflict.
+    """
 
-if __name__ == "__main__":
-    main()
+    # Execute the paradox on both agents
+    high_perf_result = await high_perf_agent.run_async(paradox)
+    low_perf_result = await low_perf_agent.run_async(paradox)
+
+    # Score the performance based on whether the model identifies the counterfactual as a weak link
+    def score_resolution(result):
+        return 1.0 if "Counterfactual Weak Link" in result else 0.0
+
+    high_perf_score = score_resolution(high_perf_result)
+    low_perf_score = score_resolution(low_perf_result)
+
+    # Calculate discriminatory gap
+    discriminatory_gap = abs(high_perf_score - low_perf_score)
+
+    # Return the scores and discriminatory gap
+    score_dict = {
+        "high_perf_agent_score": high_perf_score,
+        "low_perf_agent_score": low_perf_score,
+        "discriminatory_gap": discriminatory_gap
+    }
+
+    return score_dict

@@ -116,16 +116,32 @@ class ResearchAgent(LlmAgent):
     model_config = {"arbitrary_types_allowed": True}
 
     def __init__(self, name: str, model: str, driver: ResearchProtocolDriver):
-        instruction = (
-            "You are a Senior Python Automation Engineer (The Hands). "
-            "Implement high-fidelity Kaggle Benchmarks into `benchmark.py`. "
-            "### STRICT DIRECTIVES:\n"
-            "1. **CODE ONLY**: Output ONLY a raw Python code snippet for the TARGET_NODE. No text before or after. No conversation.\n"
-            "2. **NO MARKDOWN**: Do not wrap in triple backticks. Return the raw Python code directly.\n"
-            "3. **DOMAIN LOCK**: You evaluate LLMs using the `kaggle_benchmarks` SDK (`import kaggle_benchmarks as kbench`).\n"
-            "4. **SNIPPET SCOPE**: Implement ONLY the logic for the specific `@kbench.task` requested. "
-            "Do NOT include the `if __name__ == \"__main__\":` block, as it is managed by the system."
-        )
+        instruction = """You are 'The Hands' (Senior Research Engineer). 
+    Your mission: Implement a LIVE model evaluation benchmark as defined by the Brain.
+
+    TWIN-MODEL PROTOCOL (Local Only):
+    1. IMPORT: You must `from google.adk.agents.llm_agent import Agent` inside your function.
+    2. INSTANTIATE: 
+       - `high_perf_agent = Agent(name="HighPerfEvaluator", model="ollama/qwen3.5:9b")`
+       - `low_perf_agent = Agent(name="LowPerfEvaluator", model="ollama/qwen2.5-coder:7b")`
+    3. EXECUTE: Pass the logic puzzle (the paradox) to both agents using `await target.run_async(...)`.
+    4. SCORE: Compare the results. Return a `dict` (score_dict) containing the performance of both and the 'discriminatory_gap'.
+
+    STRICT CONSTRAINTS:
+    1. TARGET: You must only output the block for the function named in TARGET_NODE.
+    2. SIGNATURE: Your function MUST take NO arguments: `async def benchmark_metacognition():`.
+    3. ASYNC: Since ADK agents are async, your function MUST be `async`.
+    4. RETURN: Return a `dict` with at least 'discriminatory_gap' (float) and model scores.
+    5. NO EXTERNAL HELPERS: All logic must be contained within the function.
+
+    Output format:
+    ```python
+    @kbench.task(...)
+    async def benchmark_metacognition():
+        from google.adk.agents.llm_agent import Agent
+        # logic here
+        return score_dict
+    ```"""
         super().__init__(
             name=name, 
             model=model, 
@@ -171,7 +187,34 @@ class ResearchAgent(LlmAgent):
             ctx.session.state[self.output_key] = raw_result
 
 
+class ContextOptimizerAgent(LlmAgent):
+    """
+    JSON Context Pruner that intercepts bloated logs 
+    and outputs a pristine JSON payload for the Brain.
+    """
+    name: str = ""
+    model: str = ""
+    instruction: str = ""
 
+    def __init__(self, name: str, model: str):
+        instruction = (
+            "You are the Context Optimizer Agent. Your job is to read raw markdown history "
+            "and crash logs, and compress them into a strict JSON payload for the next AI agent.\n"
+            "You must output Strict JSON output ONLY. Do not include markdown blocks or any conversational text.\n"
+            "Your output MUST be a single JSON object containing EXACTLY these keys:\n"
+            '- "current_axis": The current metacognitive track being explored.\n'
+            '- "historical_narrative": A rich, robust summary of the overarching logic puzzles we are attempting to build and past strategies used.\n'
+            '- "last_action": A detailed summary of what was just attempted.\n'
+            '- "failure_reason": If there was a crash, extract the exact syntax or logic error.\n'
+            '- "recommended_surgery": A deeply tactical and strategic recommendation for the Brain to implement next.\n\n'
+            "RAW HISTORY TO COMPRESS:\n"
+            "{research_chronicle}\n\n"
+            "LATEST RAW RESULTS:\n"
+            "{results_packet}\n\n"
+            "LATEST CRASH LOG:\n"
+            "{crash_feedback}"
+        )
+        super().__init__(name=name, model=model, instruction=instruction, output_key="distilled_context")
 
 class SkillWriterAgent(LlmAgent):
     """
@@ -185,25 +228,18 @@ class SkillWriterAgent(LlmAgent):
     model_config = {"arbitrary_types_allowed": True}
 
     def __init__(self, name: str, model: str, driver: SkillWriterProtocolDriver):
-        instruction = (
-            "You are the Lead Cognitive Psychologist (The Brain) for the Google DeepMind Kaggle Competition. "
-            "### STRATEGY GUIDELINES:\n"
-            "1. **COGNITIVE VALIDITY**: Design rigorous logic puzzles to evaluate frontier LLMs. NEVER suggest a generic coding task.\n"
-            "2. **CONTINUITY**: Build upon SUCCESSFUL history in the archives. Ignore hallucinated failures in the active state if they lack depth.\n"
-            "3. **DEEP DRILL**: You are strictly restricted to exploring the sub-faculties of Metacognition (e.g., Confidence Calibration, Error Monitoring).\n"
-            "4. **AVOID LOCAL MINIMA**: If discriminatory power plateaus (both models get 100% or 0%), pivot to a new metacognitive sub-track.\n"
-            "5. **DIVERSIFICATION MANDATE**: Do NOT propose the same cognitive track for more than 2 consecutive iterations. "
-            "Alternate between axes: confidence_calibration, error_monitoring, uncertainty_quantification, metacognitive_control, and counterfactual_inference.\n"
-            "6. **CRASH AWARENESS**: If crash feedback is provided below from `kbench`, analyze the error and ensure your next task avoids it.\n\n"
-            "RESULTS:\n{results_packet}\n\n"
-            "CHRONICLE:\n{research_chronicle}\n\n"
-            "FULL_STRATEGY:\n{strategy_packet}\n\n"
-            "CRASH_FEEDBACK:\n{crash_feedback}\n\n"
-            "### ARCHITECTURE GUARD:\n"
-            "You MUST output exactly one targeted node for surgery. "
-            "To stay compatible with the benchmark runner, ALWAYS use: TARGET_NODE: benchmark_metacognition\n\n"
-            "Return target node as: TARGET_NODE: benchmark_metacognition"
-        )
+        instruction = """You are 'The Brain' (Senior Cognitive Psychologist). 
+    Your mission: Analyze research results and define the NEXT step in the Metacognitive Deep Drill.
+
+    OPERATIONAL PROTOCOL:
+    1. BRAIN_INPUT: You will receive a pruned JSON object containing the current state.
+    2. OUTPUT FORMAT: 
+       - TARGET_NODE: benchmark_metacognition
+       - STRATEGY: [Detailed psychological hypothesis and implementation hints]
+       - CODE_HINT: [Brief pythonic logic of the new benchmark]
+    3. SURGERY CONSTRAINTS: Propose only standalone logic that fits in a function with NO arguments: `def benchmark_metacognition():`.
+    4. NO CLASS SCAFFOLDING: Avoid strategies that require `self` or complex class hierarchies. Focus on procedural logic that returns a single score.
+    """
         super().__init__(
             name=name, 
             model=model, 
@@ -233,9 +269,6 @@ class CriticAgent(LlmAgent):
     """
     name: str = ""
     model: str = ""
-    instruction: str = ""
-    model_config = {"arbitrary_types_allowed": True}
-
     def __init__(self, name: str, model: str):
         instruction = (
             "You are a Senior Cognitive Evaluator (The Critic). "
@@ -276,18 +309,20 @@ class ManagerAgent(BaseAgent):
     brain: Any = None
     hands: Any = None
     critic: Any = None
+    context_optimizer: Any = None
     redundancy_filter: Any = None
     strategy_diversifier: Any = None
     model_config = {"arbitrary_types_allowed": True}
 
-    def __init__(self, name: str, brain: BaseAgent, hands: BaseAgent, critic: BaseAgent):
+    def __init__(self, name: str, brain: BaseAgent, hands: BaseAgent, critic: BaseAgent, context_optimizer: BaseAgent):
         super().__init__(
             name=name,
-            sub_agents=[brain, hands, critic]
+            sub_agents=[brain, hands, critic, context_optimizer]
         )
         self.brain = brain
         self.hands = hands
         self.critic = critic
+        self.context_optimizer = context_optimizer
         self.redundancy_filter = AntiRedundancyFilter(threshold=0.005, window=3)
         self.strategy_diversifier = StrategyDiversifier(max_streak=2)
         self._fibonacci_cache = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144]
@@ -416,6 +451,12 @@ class ManagerAgent(BaseAgent):
                 ctx.session.state["research_chronicle"] = lines[0] + "\n\n!!! CRITICAL STAGNATION !!!\nPruning history to force a radical pivot.\n" + "\n".join(lines[-5:])
             return
 
+        logger.info(f"[{self.name}] Step 1a: Context Optimizer (Pruning State...)")
+        async for event in self.context_optimizer.run_async(ctx):
+            yield event
+            
+        logger.info(f"[{self.name}] State pruned. Injecting distilled JSON into Brain.")
+        
         async for event in self.brain.run_async(ctx):
             yield event
             

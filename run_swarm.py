@@ -7,7 +7,7 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
 
-from swarm.agents import ResearchAgent, SkillWriterAgent, CriticAgent, ManagerAgent
+from swarm.agents import ResearchAgent, SkillWriterAgent, CriticAgent, ManagerAgent, ContextOptimizerAgent
 from swarm.drivers import ResearchProtocolDriver, SkillWriterProtocolDriver
 from swarm.coordinator import SwarmCoordinator
 
@@ -40,7 +40,19 @@ logger = logging.getLogger("swarm.main")
 REPO_PATH = os.path.join(BASE_DIR, "research_env")
 APP_NAME = "mental_research_swarm"
 USER_ID = "surfiniaburger"
-SESSION_ID = "swarm_001"
+SESSION_ID = "swarm_context_opt_001"
+
+
+def load_env_file(env_path):
+    """Manually load .env file to avoid extra dependencies."""
+    if os.path.exists(env_path):
+        with open(env_path) as f:
+            for line in f:
+                if "=" in line and not line.startswith("#"):
+                    key, value = line.strip().split("=", 1)
+                    os.environ[key] = value.strip('"').strip("'")
+        return True
+    return False
 
 
 def log_banner(msg: str):
@@ -55,6 +67,12 @@ async def main():
     log_banner("🚀 ADK RESEARCH SWARM — SESSION START")
     logger.info(f"Timestamp: {datetime.now().isoformat()}")
     logger.info(f"Log file:  {SWARM_LOG}")
+
+    # 0. Load Environment
+    if load_env_file(os.path.join(BASE_DIR, ".env")):
+        logger.info("🔑 Loaded .env credentials.")
+    else:
+        logger.warning("⚠️ No .env file found. Cloud models may fail.")
 
     # 1. Start MCP Server
     logger.info("🧪 Starting Research MCP Server...")
@@ -85,7 +103,8 @@ async def main():
         r_driver = ResearchProtocolDriver(mcp_client)
         sw_driver = SkillWriterProtocolDriver(mcp_client)
         
-        # Pull model overrides from env or use Qwen 3.5 defaults
+        # Cloud tier exhausted. Reverting to local local models as requested.
+        # Direct local local naming (no prefix for ADK native, prefix for LlmAgent).
         MODEL_BRAIN = os.environ.get("BRAIN_MODEL", "ollama/qwen3.5:9b")
         MODEL_MANAGER = os.environ.get("MANAGER_MODEL", "ollama/qwen2.5-coder:7b")
         MODEL_HANDS = os.environ.get("HANDS_MODEL", "ollama/qwen2.5-coder:7b")
@@ -105,12 +124,17 @@ async def main():
             name="TheCritic",
             model=MODEL_CRITIC
         )
+        context_optimizer = ContextOptimizerAgent(
+            name="ContextOptimizer",
+            model=MODEL_MANAGER
+        )
         
         manager_agent = ManagerAgent(
             name="MidLevelManager",
             brain=skill_writer,
             hands=research_agent,
-            critic=critic_agent
+            critic=critic_agent,
+            context_optimizer=context_optimizer
         )
         
         coordinator = SwarmCoordinator(
@@ -128,8 +152,9 @@ async def main():
             state={
                 "topic": "Generate and Evaluate AGI Benchmarks (Kaggle)",
                 "benchmark_py": open(os.path.join(BASE_DIR, "research_env/benchmark.py")).read() if os.path.exists(os.path.join(BASE_DIR, "research_env/benchmark.py")) else "",
+                "program_md": open(os.path.join(BASE_DIR, "research_env/program.md")).read() if os.path.exists(os.path.join(BASE_DIR, "research_env/program.md")) else "",
                 "results_packet": "No iterations completed yet. Starting from baseline.",
-                "strategy_packet": "Establish a stable Metacognitive baseline. Drill deep into the 5 metacognitive sub-levels (calibration, error monitoring, etc.). Do not explore general cognition.",
+                "strategy_packet": open(os.path.join(BASE_DIR, "research_env/program.md")).read() if os.path.exists(os.path.join(BASE_DIR, "research_env/program.md")) else "Establish a stable Metacognitive baseline...",
                 "crash_feedback": "None"
             }
         )

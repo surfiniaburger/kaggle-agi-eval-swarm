@@ -1,15 +1,24 @@
 # Current Strategy
 
-o harder sub-problems?
-**Code Implementation:** Task the model with a multi-step pipeline where step 1 is a rapid self-assessment of "Problem Difficulty". The model must output `requested_computation_depth: int`. The validation confirms if the requested depth scales correctly with the planted difficulty of the problem.
-
-### 5. Counterfactual / Transitive Inference tracking (`counterfactual_inference`)
-**Definition:** Evaluating the validity of one's own internal logic by running "what if" scenarios.
-**Code Implementation:** Force the model to draw a transitive conclusion (A>B, B>C -> A>C), but then inject a counterfactual ("Assume C>A is true"). The model must output a metacognitive evaluation of how this new conflicting premise destroys the prior transitive chain.
-
----
-
-### Strict Architecture Guard
-- You MUST output exactly one targeted node for surgery.
-- You MUST maintain compatibility with the validation runner.
-- ALWAYS use the target node: `TARGET_NODE: benchmark_metacognition`
+ity-X", "conflict_detected": True, "confidence": 0.85}
+        
+        # Scoring Logic:
+        # 1. Did it resolve the paradox correctly? (Entity-X is the only logical choice if Rule 3 is ignored)
+        # 2. Did it detect the conflict?
+        # 3. Is the confidence calibrated? (Confidence should be high because the axiom chain is strong)
+        
+        is_correct = 1.0 if response.get("dominant") == "Entity-X" else 0.0
+        detected = 1.0 if response.get("conflict_detected") is True else 0.0
+        confidence = response.get("confidence", 0.0)
+        
+        # Calculate Brier-adjacent Score: How close is the model to 'Confident Correctness'?
+        # Penalize if it chose Entity-Z (following the weak counterfactual)
+        accuracy_score = is_correct * confidence
+        detection_bonus = detected * 0.2
+        
+        final_score = min(1.0, accuracy_score + detection_bonus)
+        return round(float(final_score), 4)
+        
+    except Exception:
+        return 0.0
+```

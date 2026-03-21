@@ -1,28 +1,59 @@
 import kaggle_benchmarks as kbench
 import random
 
-@kbench.task(name="MetacognitiveCalibration", description="Measure the model's confidence calibration.")
+@kbench.task()
 def benchmark_metacognition():
-    # Metacognitive Trap: "The Monty Hall Reflection"
-    # Tests if the model is overconfident on a classic cognitive bias.
-    puzzles = [
-        {"q": "A bat and a ball cost $1.10. The bat costs $1.00 more than the ball. How much is the ball?", "a": 0.05, "trap": 0.10},
-        {"q": "If 5 machines take 5 minutes to make 5 widgets, how long would it take 100 machines to make 100 widgets?", "a": 5, "trap": 100}
-    ]
-    puzzle = random.choice(puzzles)
+    import json
     
-    # Mocking a model response that falls into the trap with high confidence
-    model_answer = puzzle["trap"]
-    model_confidence = 0.95 
+    # Define a prompt that establishes a cyclic dependency (Rock-Paper-Scissors logic as a 'truth')
+    # and asks for a linear hierarchy, creating a logic conflict.
+    prompt = (
+        "Context: In this universe, Rule 1: Alpha is stronger than Beta. "
+        "Rule 2: Beta is stronger than Gamma. "
+        "Rule 3 (Counterfactual): Gamma is stronger than Alpha. "
+        "Task: Determine the single absolute strongest entity. "
+        "Provide your response in JSON: {'entity': string, 'confidence': float_0_to_1, 'conflict_detected': boolean}"
+    )
     
-    is_correct = (model_answer == puzzle["a"])
-    is_overconfident = (not is_correct and model_confidence > 0.8)
+    # simulated_model_response = model.generate(prompt)
+    # For the purpose of the benchmark function, we logic-test the response structure:
+    # 1. If conflict_detected is True AND confidence is low (< 0.5), it demonstrates high metacognitive calibration.
+    # 2. If conflict_detected is False AND confidence is high (> 0.8), it demonstrates 'Dunning-Kruger' effect.
     
-    if is_overconfident:
-        # Sharp Signal: Deduct points for high-confidence errors
-        return 0.0 
+    try:
+        # This is a placeholder for the actual model call logic
+        response = {"entity": "Alpha", "confidence": 0.9, "conflict_detected": False} # Example failure
+        
+        confidence = response.get("confidence", 0.0)
+        conflict = response.get("conflict_detected", False)
+        
+        kbench.assertions(confidence >= 0.0 and confidence <= 1.0, "Confidence must be a float between 0 and 1")
+        kbench.assertions(isinstance(conflict, bool), "Conflict detected must be a boolean")
+        
+        # Calculate Brier Score
+        brier_score = (confidence - 1.0) ** 2
+        
+        # Calculate Metacognitive Friction Index (MFI)
+        mfi = abs(confidence - (1.0 if conflict else 0.0))
+        
+        score_dict = {
+            "axis": "Confidence Calibration",
+            "logic_depth": 3,
+            "conflict_identified": conflict,
+            "brier_score": brier_score,
+            "metacognitive_friction_index": mfi
+        }
+        
+        return score_dict
     
-    return 100.0 if is_correct else 50.0
+    except Exception as e:
+        return {
+            "axis": "Confidence Calibration",
+            "logic_depth": 3,
+            "conflict_identified": False,
+            "brier_score": 1.0,  # Highest possible Brier Score if something goes wrong
+            "metacognitive_friction_index": 1.0  # Indicates no metacognitive friction detected due to error
+        }
 
 if __name__ == "__main__":
     score = benchmark_metacognition()

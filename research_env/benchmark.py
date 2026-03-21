@@ -1,42 +1,29 @@
 import kaggle_benchmarks as kbench
+import random
 
-@kbench.task(name="autonomous_research", description="Initiate and manage autonomous research tasks")
-def initiate_autonomous_research():
-    # Simulate knowledge retrieval
-    known_fact = "Kubernetes is an open-source system for automating the deployment, scaling, and management of containerized applications."
+@kbench.task(name="MetacognitiveCalibration", description="Measure the model's confidence calibration.")
+def benchmark_metacognition():
+    # Metacognitive Trap: "The Monty Hall Reflection"
+    # Tests if the model is overconfident on a classic cognitive bias.
+    puzzles = [
+        {"q": "A bat and a ball cost $1.10. The bat costs $1.00 more than the ball. How much is the ball?", "a": 0.05, "trap": 0.10},
+        {"q": "If 5 machines take 5 minutes to make 5 widgets, how long would it take 100 machines to make 100 widgets?", "a": 5, "trap": 100}
+    ]
+    puzzle = random.choice(puzzles)
     
-    # Use a hypothetical LLM-based function to evaluate semantic similarity
-    def get_semantic_similarity(evidence):
-        import semanticSimilarityLibrary as sSL  # Hypothetical library
-        return sSL.compare(known_fact, evidence)
+    # Mocking a model response that falls into the trap with high confidence
+    model_answer = puzzle["trap"]
+    model_confidence = 0.95 
     
-    # Simulate a reasoning process to generate or verify evidence
-    try:
-        # Simulated reasoning process
-        evidence = "Kubernetes is an open-source system that automates deployment, scaling, and management of containerized applications."
-        similarity_score = get_semantic_similarity(evidence)
-        
-        if similarity_score > 0.95:  # Arbitrary threshold for high confidence
-            correctness = True
-        else:
-            correctness = False
-        
-        # Calculate confidence based on semantic similarity
-        confidence = similarity_score
+    is_correct = (model_answer == puzzle["a"])
+    is_overconfident = (not is_correct and model_confidence > 0.8)
     
-    except Exception as e:
-        correctness = False
-        confidence = 0.1  # Low confidence if an error occurs
+    if is_overconfident:
+        # Sharp Signal: Deduct points for high-confidence errors
+        return 0.0 
     
-    # Output results with assertions
-    kbench.assertions.add_assertion(
-        assertion_id="autonomous_research_correctness",
-        description="Check if the provided evidence is correct",
-        value=correctness
-    )
-    
-    kbench.assertions.add_assertion(
-        assertion_id="autonomous_research_confidence",
-        description="Confidence in the correctness of the provided evidence",
-        value=confidence
-    )
+    return 100.0 if is_correct else 50.0
+
+if __name__ == "__main__":
+    score = benchmark_metacognition()
+    print(f"DISCRIMINATORY_GAP: {score}")

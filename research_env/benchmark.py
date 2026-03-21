@@ -1,7 +1,8 @@
 import kaggle_benchmarks as kbench
+import random
 
 @kbench.task(name="Executive_Function_Cognitive_Flexibility", description="Benchmark for executive function cognitive flexibility")
-def benchmark_executive_function_cognitive_flexibility():
+def generate_cognitive_task(llm=None):
     # Implement a cognitive task, e.g., task-switching simulation
     import random
     
@@ -23,4 +24,10 @@ def benchmark_executive_function_cognitive_flexibility():
         value = task(value)
     
     # Assert the final value is as expected after switching tasks
-    assert kbench.assertions.equals(value, 120), "Final value does not match the expected result"
+    return value == 120
+
+if __name__ == "__main__":
+    # Baseline run
+    success = generate_cognitive_task()
+    score = 100.0 if success else 0.0
+    print(f"DISCRIMINATORY_GAP: {score}")

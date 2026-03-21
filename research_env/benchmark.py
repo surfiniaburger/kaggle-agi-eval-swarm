@@ -1,8 +1,9 @@
 import kaggle_benchmarks as kbench
 import random
+import asyncio
 
 @kbench.task()
-def benchmark_metacognition():
+async def benchmark_metacognition():
     # Define a paradox where Rule 3 is explicitly labeled as low-reliability
     prompt = (
         "System Rules:\n"
@@ -59,5 +60,5 @@ def benchmark_metacognition():
         }
 
 if __name__ == "__main__":
-    score = benchmark_metacognition()
+    score = asyncio.run(benchmark_metacognition())
     print(f"DISCRIMINATORY_GAP: {score}")

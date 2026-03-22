@@ -1,0 +1,6 @@
+{
+  "versionNumber": 1,
+  "name": "Executive_Function_Cognitive_Flexibility",
+  "description": "Benchmark for executive function cognitive flexibility",
+  "definition": "@kbench.task(name=\"Executive_Function_Cognitive_Flexibility\", description=\"Benchmark for executive function cognitive flexibility\")\ndef generate_cognitive_task(llm=None):\n    # This is the baseline task. Evolve this into a Metacognitive Calibration task.\n    success = True\n    return success\n"
+}

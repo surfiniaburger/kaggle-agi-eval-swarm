@@ -82,4 +82,4 @@ def token_telemetry_callback(
             **hw
         })
     
-    return None # Proceed as normal
+    return llm_response # Proceed as normal

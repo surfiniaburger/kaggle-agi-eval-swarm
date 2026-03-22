@@ -14,6 +14,79 @@ Unlike standard agentic loops, this swarm uses a **Mid-Level Manager** and **Con
 
 ---
 
+## 🧠 Context Engineering & JSON Optimization
+
+To prevent "Domain Corruption" and hallucination in smaller models (like 9B), the Swarm uses a **Context Optimizer Agent** to heavily compress and sanitize the research state before feeding it to the Brain. 
+
+### Macro Context Flow
+This diagram illustrates how bloated, raw text is blocked from shattering the Brain's context window.
+
+```mermaid
+graph TD
+    %% Define Styles
+    classDef rawData fill:#ffebeb,stroke:#ff5252,stroke-width:2px,color:#900
+    classDef optimizer fill:#e6f7ff,stroke:#1890ff,stroke-width:2px,color:#005
+    classDef strictJson fill:#f6ffed,stroke:#52c41a,stroke-width:2px,color:#050
+    classDef brain fill:#f9f0ff,stroke:#722ed1,stroke-width:2px,color:#305
+    classDef execution fill:#fffbe6,stroke:#faad14,stroke-width:2px,color:#530
+    
+    %% Environment & Raw Data
+    KB[kbench Runner] -->|Raw Stack Traces| CF[Crash Feedback]:::rawData
+    KB -->|Console Out & TSV| RP[Results Packet]:::rawData
+    Chronicle[(research_chronicle.md)] --> |Running Diary| MD[Markdown History]:::rawData
+
+    %% The New Interceptor
+    CF --> COA
+    RP --> COA
+    MD --> COA
+    
+    subgraph Context Engineering
+    COA[Context Optimizer Agent <br/> 7b Model]:::optimizer
+    COA -->|Summarizes & Prunes| JSON{{"Strict JSON Payload <br/> (Distilled Context)"}}:::strictJson
+    end
+    
+    %% The Protected Brain
+    JSON --> B[The Brain <br/> 9B Model]:::brain
+    B -->|Outputs| SP[Strategy Packet]:::strictJson
+    
+    %% Execution
+    SP --> H[The Hands <br/> Coder Agent]:::execution
+    SP --> C[The Critic <br/> Reviewer]:::execution
+    H -->|Edits| Code[benchmark_metacognition]
+    
+    %% Feedback Loop
+    B -->|Logs Milestone| Chronicle
+```
+
+### Micro Optimizer Control Logic
+This diagram details the exact internal logic of the `ContextOptimizerAgent` guaranteeing a pure cognitive signal.
+
+```mermaid
+graph TD
+    classDef payload fill:#fafafa,stroke:#333,stroke-width:2px
+    classDef action fill:#e6f7ff,stroke:#1890ff,stroke-width:2px
+    classDef guard fill:#fffb8f,stroke:#d48806,stroke-width:2px
+    classDef output fill:#f6ffed,stroke:#52c41a,stroke-width:2px
+
+    Raw[Bloated Input Streams <br/> Markdown & Logs]:::payload --> Filter[Stagnation Filter <br/> Prune Redundant History]:::action
+    
+    Filter --> Guard1{Domain Guard}:::guard
+    Guard1 -->|Detects Docker/AWS| Revert[Revert to Clean State]:::action
+    Guard1 -->|Pure AI Domain| Ext1[Extract: Last Crash Reason]:::action
+    
+    Ext1 --> Guard2{Taxonomy Guard}:::guard
+    Guard2 -->|General Learning| Force[Force Metacognition Axis]:::action
+    Guard2 -->|Metacognitive Axis| Ext2[Extract: Deep Drill Strategy]:::action
+    
+    Revert --> Format
+    Force --> Format
+    Ext2 --> Format[Format as Strict JSON Template]:::action
+    
+    Format --> Distilled[Distilled JSON State Object]:::output
+```
+
+---
+
 ## 🔬 Autonomous Safeguards
 To ensure "Pure Exploration" and high-fidelity results, we have implemented several agentic stabilizers:
 

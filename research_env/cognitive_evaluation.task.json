@@ -1,0 +1,6 @@
+{
+  "versionNumber": 1,
+  "name": "cognitive_evaluation",
+  "description": "Template function for the swarm to implement a specific cognitive evaluation.\nEvaluate the LLM's capability on the requested track (e.g. Metacognition).",
+  "definition": "@kbench.task(name=\"cognitive_evaluation\")\ndef generate_cognitive_task(llm):\n    \"\"\"\n    Template function for the swarm to implement a specific cognitive evaluation.\n    Evaluate the LLM's capability on the requested track (e.g. Metacognition).\n    \"\"\"\n    prompt = \"Reply with 'ready'.\"\n    response = llm.prompt(prompt)\n    kbench.assertions.assert_contains_regex(\"ready\", response.lower(), expectation=\"LLM should be ready.\")\n"
+}

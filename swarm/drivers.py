@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ResearchResult:
-    val_bpb: float
+    val_score: float
     peak_vram_gb: float
     status: str
     description: str
@@ -20,14 +20,29 @@ class ResearchProtocolDriver:
     """
     def __init__(self, mcp_client):
         self.mcp = mcp_client
-        self.repo_path = "/Users/surfiniaburger/Desktop/mental-research-swarm/research_env"
+        self.repo_path = "/Users/surfiniaburger/Desktop/kaggle-agi-eval-swarm/research_env"
 
     async def log_result(self, result: ResearchResult) -> None:
-        line = f"baseline\t{result.val_bpb}\t{result.peak_vram_gb}\t{result.status}\t{result.description}\n"
+        state_path = "benchmark_state.json"
+        res = await self.mcp.call_tool("read_research_file", {"path": state_path})
+        
+        history = []
+        if "Error" not in res and res.strip() != "":
+            try:
+                history = json.loads(res)
+            except:
+                history = []
+                
+        history.append({
+            "val_score": result.val_score,
+            "peak_vram_gb": result.peak_vram_gb,
+            "status": result.status,
+            "description": result.description
+        })
+        
         await self.mcp.call_tool("write_research_file", {
-            "path": "results.tsv",
-            "content": line,
-            "append": True
+            "path": state_path,
+            "content": json.dumps(history, indent=2)
         })
 
     async def ensure_setup(self) -> bool:
@@ -47,49 +62,43 @@ class ResearchProtocolDriver:
                 "cwd": self.repo_path
             })
 
-        results_path = "results.tsv"
-        res = await self.mcp.call_tool("read_research_file", {"path": results_path})
+        state_path = "benchmark_state.json"
+        res = await self.mcp.call_tool("read_research_file", {"path": state_path})
         if "Error" in res:
-            header = "commit\tval_bpb\tmemory_gb\tstatus\tdescription\n"
             await self.mcp.call_tool("write_research_file", {
-                "path": results_path,
-                "content": header
+                "path": state_path,
+                "content": "[]"
             })
         return True
 
     async def get_history(self) -> List[ResearchResult]:
-        """Reads results.tsv and returns a list of ResearchResult objects."""
-        res = await self.mcp.call_tool("read_research_file", {"path": "results.tsv"})
+        """Reads benchmark_state.json and returns a list of ResearchResult objects."""
+        res = await self.mcp.call_tool("read_research_file", {"path": "benchmark_state.json"})
         history = []
-        if "Error" in res:
+        if "Error" in res or not res.strip():
             return history
             
-        lines = res.strip().split("\n")
-        if len(lines) <= 1: # Header only
-            return history
-            
-        for line in lines[1:]: # Skip header
-            try:
-                parts = line.split("\t")
-                if len(parts) >= 4:
-                    history.append(ResearchResult(
-                        val_bpb=float(parts[1]),
-                        peak_vram_gb=float(parts[2]),
-                        status=parts[3],
-                        description=parts[4] if len(parts) > 4 else ""
-                    ))
-            except Exception as e:
-                logger.warning(f"Error parsing history line: {e}")
+        try:
+            data = json.loads(res)
+            for item in data:
+                history.append(ResearchResult(
+                    val_score=float(item.get("val_score", 0.0)),
+                    peak_vram_gb=float(item.get("peak_vram_gb", 0.0)),
+                    status=item.get("status", "unknown"),
+                    description=item.get("description", "")
+                ))
+        except Exception as e:
+            logger.warning(f"Error parsing history JSON: {e}")
         return history
 
     async def run_experiment(self, description: str) -> ResearchResult:
         await self.mcp.call_tool("execute_command", {
-            "command": f'git add train.py && git commit -m "autocommit: {description}"',
+            "command": f'git add benchmark.py && git commit -m "autocommit: {description}"',
             "cwd": self.repo_path
         })
 
         await self.mcp.call_tool("execute_command", {
-            "command": "uv run -q train.py > run.log 2>&1",
+            "command": "uv run -q benchmark.py > run.log 2>&1",
             "cwd": self.repo_path,
             "timeout": 1200
         })
@@ -97,21 +106,23 @@ class ResearchProtocolDriver:
         return await self._parse_metrics("run.log")
 
     async def _parse_metrics(self, log_filename: str) -> ResearchResult:
+        val_score = 0.0
         log_content = await self.mcp.call_tool("read_research_file", {"path": log_filename})
-        val_bpb = 0.0
-        vram_mb = 0.0
-        
         for line in log_content.splitlines():
-            if line.startswith("val_bpb:"):
-                val_bpb = float(line.split(":")[1].strip())
-            if line.startswith("peak_vram_mb:"):
-                vram_mb = float(line.split(":")[1].strip())
+            if "DISCRIMINATORY_GAP:" in line:
+                try:
+                    val_score = float(line.split("DISCRIMINATORY_GAP:")[1].strip())
+                except:
+                    pass
                 
+        # If the metric line was found, it's not a crash, even if the score is 0.0
+        is_metric_present = any("DISCRIMINATORY_GAP:" in line for line in log_content.splitlines())
+        
         return ResearchResult(
-            val_bpb=val_bpb,
-            peak_vram_gb=round(vram_mb / 1024.0, 1),
-            status="keep" if val_bpb > 0 else "crash",
-            description="Experiment run"
+            val_score=val_score,
+            peak_vram_gb=0.0,
+            status="keep" if is_metric_present else "crash",
+            description="Benchmark run"
         )
 
     async def read_crash_log(self, max_lines: int = 30) -> str:
@@ -136,10 +147,10 @@ class SkillWriterProtocolDriver:
     """
     def __init__(self, mcp_client):
         self.mcp = mcp_client
-        self.repo_path = "/Users/surfiniaburger/Desktop/mental-research-swarm/research_env"
+        self.repo_path = "/Users/surfiniaburger/Desktop/kaggle-agi-eval-swarm/research_env"
 
     async def get_latest_results(self) -> str:
-        return await self.mcp.call_tool("read_research_file", {"path": "results.tsv"})
+        return await self.mcp.call_tool("read_research_file", {"path": "benchmark_state.json"})
 
     async def get_latest_log(self) -> str:
         try:

@@ -24,15 +24,15 @@ class AntiRedundancyFilter:
         
         # Look at the last 'window' results
         recent = history[-self.window:]
-        bpbs = [r.val_bpb for r in recent if r.val_bpb > 0]
+        scores = [r.val_score for r in recent if r.val_score > 0]
         
-        if len(bpbs) < self.window:
+        if len(scores) < self.window:
             return False
             
         # Calculate max improvement spread in this window
-        # We assume lower BPB is better. 
-        # So we look at max(bpbs) - min(bpbs)
-        max_delta = max(bpbs) - min(bpbs)
+        # We assume higher Score is better. 
+        # So we look at max(scores) - min(scores)
+        max_delta = max(scores) - min(scores)
         return max_delta < self.threshold
 
 
@@ -54,20 +54,13 @@ class StrategyDiversifier:
     to force exploration of different research axes.
     """
     
-    # Category keywords — each list defines a research axis
+    # The new taxonomy sub-levels of Metacognition:
     CATEGORY_KEYWORDS = {
-        "optimizer": ["optimizer", "adam", "adamw", "sgd", "learning_rate", "lr_scheduler",
-                      "cosineanneal", "reducelronplateau", "configure_optimizers", "weight_decay",
-                      "momentum", "warmup", "eta_min", "t_mult"],
-        "attention": ["attention", "self_attention", "multi_head", "flash_attention",
-                      "kv_cache", "rotary", "rope", "alibi", "causal_mask"],
-        "architecture": ["transformer", "layer_norm", "feedforward", "mlp", "embedding",
-                         "positional", "residual", "dropout", "hidden_dim", "num_layers",
-                         "num_heads", "expert", "moe", "gating"],
-        "loss": ["loss", "cross_entropy", "label_smoothing", "distillation",
-                 "auxiliary_loss", "regularization", "l2_norm", "entropy"],
-        "data": ["batch_size", "sequence_length", "tokenizer", "curriculum",
-                 "data_augmentation", "sampling", "shuffle"],
+        "confidence_calibration": ["calibration", "confidence", "accuracy", "alignment", "resolution", "meta-d"],
+        "error_monitoring": ["error", "monitoring", "detection", "mistake", "self_correction", "fault"],
+        "uncertainty_quantification": ["uncertainty", "quantification", "probability", "grading", "nuance", "grading"],
+        "metacognitive_control": ["control", "information_seeking", "allocation", "time", "effort", "exploration"],
+        "counterfactual_inference": ["counterfactual", "inference", "what_if", "alternative", "transitive", "hypothetical"],
     }
     
     def __init__(self, max_streak: int = 2):
@@ -123,15 +116,32 @@ class ResearchAgent(LlmAgent):
     model_config = {"arbitrary_types_allowed": True}
 
     def __init__(self, name: str, model: str, driver: ResearchProtocolDriver):
-        instruction = (
-            "You are a Senior Research Engineer (The Hands). "
-            "Implement high-fidelity AI research changes into `train.py`. "
-            "### STRICT DIRECTIVES:\n"
-            "1. **CODE ONLY**: Output ONLY a raw Python code snippet for the TARGET_NODE. No text before or after. No conversation.\n"
-            "2. **NO MARKDOWN**: Do not wrap in triple backticks. Return the raw Python code directly.\n"
-            "3. **DOMAIN LOCK**: You are an AI Researcher. Focus exclusively on PyTorch/Tensor logic. Ignore any mention of web, cloud, or Terraform.\n"
-            "4. **SNIPPET SCOPE**: Implement ONLY the logic for the specific TARGET_NODE requested.\n"
-        )
+        instruction = """You are 'The Hands' (Senior Research Engineer). 
+    Your mission: Implement a LIVE model evaluation benchmark as defined by the Brain.
+
+    TWIN-MODEL PROTOCOL (Local Only):
+    1. IMPORT: You must `from google.adk.agents.llm_agent import Agent` inside your function.
+    2. INSTANTIATE: 
+       - `high_perf_agent = Agent(name="HighPerfEvaluator", model="ollama/qwen3.5:9b")`
+       - `low_perf_agent = Agent(name="LowPerfEvaluator", model="ollama/qwen2.5-coder:7b")`
+    3. EXECUTE: Pass the logic puzzle (the paradox) to both agents using `await target.run_async(...)`.
+    4. SCORE: Compare the results. Return a `dict` (score_dict) containing the performance of both and the 'discriminatory_gap'.
+
+    STRICT CONSTRAINTS:
+    1. TARGET: You must only output the block for the function named in TARGET_NODE.
+    2. SIGNATURE: Your function MUST take NO arguments: `async def benchmark_metacognition():`.
+    3. ASYNC: Since ADK agents are async, your function MUST be `async`.
+    4. RETURN: Return a `dict` with at least 'discriminatory_gap' (float) and model scores.
+    5. NO EXTERNAL HELPERS: All logic must be contained within the function.
+
+    Output format:
+    ```python
+    @kbench.task(...)
+    async def benchmark_metacognition():
+        from google.adk.agents.llm_agent import Agent
+        # logic here
+        return score_dict
+    ```"""
         super().__init__(
             name=name, 
             model=model, 
@@ -177,7 +187,34 @@ class ResearchAgent(LlmAgent):
             ctx.session.state[self.output_key] = raw_result
 
 
+class ContextOptimizerAgent(LlmAgent):
+    """
+    JSON Context Pruner that intercepts bloated logs 
+    and outputs a pristine JSON payload for the Brain.
+    """
+    name: str = ""
+    model: str = ""
+    instruction: str = ""
 
+    def __init__(self, name: str, model: str):
+        instruction = (
+            "You are the Context Optimizer Agent. Your job is to read raw markdown history "
+            "and crash logs, and compress them into a strict JSON payload for the next AI agent.\n"
+            "You must output Strict JSON output ONLY. Do not include markdown blocks or any conversational text.\n"
+            "Your output MUST be a single JSON object containing EXACTLY these keys:\n"
+            '- "current_axis": The current metacognitive track being explored.\n'
+            '- "historical_narrative": A rich, robust summary of the overarching logic puzzles we are attempting to build and past strategies used.\n'
+            '- "last_action": A detailed summary of what was just attempted.\n'
+            '- "failure_reason": If there was a crash, extract the exact syntax or logic error.\n'
+            '- "recommended_surgery": A deeply tactical and strategic recommendation for the Brain to implement next.\n\n'
+            "RAW HISTORY TO COMPRESS:\n"
+            "{research_chronicle}\n\n"
+            "LATEST RAW RESULTS:\n"
+            "{results_packet}\n\n"
+            "LATEST CRASH LOG:\n"
+            "{crash_feedback}"
+        )
+        super().__init__(name=name, model=model, instruction=instruction, output_key="distilled_context")
 
 class SkillWriterAgent(LlmAgent):
     """
@@ -191,22 +228,18 @@ class SkillWriterAgent(LlmAgent):
     model_config = {"arbitrary_types_allowed": True}
 
     def __init__(self, name: str, model: str, driver: SkillWriterProtocolDriver):
-        instruction = (
-            "You are a Senior AI Research Scientist (The Brain). "
-            "### STRATEGY GUIDELINES:\n"
-            "1. **ALGORITHMIC INTEGRITY**: Propose mathematically sound architectural changes. NEVER suggest a 'crash' or 'stub' for testing.\n"
-            "2. **CONTINUITY**: Build upon SUCCESSFUL history in the archives. Ignore hallucinated failures in the active TSV if they lack technical depth.\n"
-            "3. **TOTAL FREEDOM**: You are not limited to MoE. Explore Attention, Optimizers, or Curricula.\n"
-            "4. **AVOID LOCAL MINIMA**: If results plateau, pivot to a new Era.\n"
-            "5. **DIVERSIFICATION MANDATE**: Do NOT propose optimizer-only changes for more than 2 consecutive iterations. "
-            "Alternate between research axes: architecture, attention, loss functions, data processing, and optimizers.\n"
-            "6. **CRASH AWARENESS**: If crash feedback is provided below, analyze the error and ensure your next proposal avoids the same failure pattern.\n\n"
-            "RESULTS:\n{results_packet}\n\n"
-            "CHRONICLE:\n{research_chronicle}\n\n"
-            "FULL_STRATEGY:\n{strategy_packet}\n\n"
-            "CRASH_FEEDBACK:\n{crash_feedback}\n\n"
-            "Return target node as: TARGET_NODE: [NodeName]"
-        )
+        instruction = """You are 'The Brain' (Senior Cognitive Psychologist). 
+    Your mission: Analyze research results and define the NEXT step in the Metacognitive Deep Drill.
+
+    OPERATIONAL PROTOCOL:
+    1. BRAIN_INPUT: You will receive a pruned JSON object containing the current state.
+    2. OUTPUT FORMAT: 
+       - TARGET_NODE: benchmark_metacognition
+       - STRATEGY: [Detailed psychological hypothesis and implementation hints]
+       - CODE_HINT: [Brief pythonic logic of the new benchmark]
+    3. SURGERY CONSTRAINTS: Propose only standalone logic that fits in a function with NO arguments: `def benchmark_metacognition():`.
+    4. NO CLASS SCAFFOLDING: Avoid strategies that require `self` or complex class hierarchies. Focus on procedural logic that returns a single score.
+    """
         super().__init__(
             name=name, 
             model=model, 
@@ -236,18 +269,14 @@ class CriticAgent(LlmAgent):
     """
     name: str = ""
     model: str = ""
-    instruction: str = ""
-    model_config = {"arbitrary_types_allowed": True}
-
     def __init__(self, name: str, model: str):
         instruction = (
-            "You are a Senior Code Reviewer (The Critic). "
-            "Review the proposed changes against the strategy and PREVIOUS successful patches.\n\n"
+            "You are a Senior Cognitive Evaluator (The Critic). "
+            "Review the proposed `@kbench.task` code against the strategy.\n\n"
             "STRATEGY:\n{strategy_packet}\n\n"
-            "OLD_CODE:\n{target_snippet}\n\n"
             "NEW_CODE:\n{validated_code}\n\n"
-            "ANTI-REDUNDANCY FILTER: If the proposed code is structurally 90% identical to previous "
-            "successful versions but doesn't offer a clear theoretical breakthrough, REJECT it. "
+            "ASSERTION FILTER: If the proposed code lacks strict `kbench.assertions` "
+            "or tests basic memorization instead of the requested cognitive track, REJECT it. "
             "Start your response with 'APPROVE' or 'REJECT'."
         )
         super().__init__(
@@ -280,18 +309,20 @@ class ManagerAgent(BaseAgent):
     brain: Any = None
     hands: Any = None
     critic: Any = None
+    context_optimizer: Any = None
     redundancy_filter: Any = None
     strategy_diversifier: Any = None
     model_config = {"arbitrary_types_allowed": True}
 
-    def __init__(self, name: str, brain: BaseAgent, hands: BaseAgent, critic: BaseAgent):
+    def __init__(self, name: str, brain: BaseAgent, hands: BaseAgent, critic: BaseAgent, context_optimizer: BaseAgent):
         super().__init__(
             name=name,
-            sub_agents=[brain, hands, critic]
+            sub_agents=[brain, hands, critic, context_optimizer]
         )
         self.brain = brain
         self.hands = hands
         self.critic = critic
+        self.context_optimizer = context_optimizer
         self.redundancy_filter = AntiRedundancyFilter(threshold=0.005, window=3)
         self.strategy_diversifier = StrategyDiversifier(max_streak=2)
         self._fibonacci_cache = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144]
@@ -408,18 +439,11 @@ class ManagerAgent(BaseAgent):
         history = await self.hands.driver.get_history()
         if self.redundancy_filter.check(history):
             logger.warning(f"[{self.name}] Stagnation detected. Triggering Anti-Redundancy rejection.")
-            yield Event(
-                name="CriticFeedback",
-                data={
-                    "feedback": (
-                        "### Evaluation Result: REJECT (Failed Anti-Redundancy Filter)\n\n"
-                        "**Reasoning:**\n"
-                        "1. **Redundancy Analysis**: Performance delta has dropped below 0.005 across the last 3 iterations.\n"
-                        "2. **Stagnation**: Research has plateaued. Re-submitting structural variations of existing logic is redundant.\n"
-                        "3. **Feedback**: Please provide specific deviations or a new theoretical adjustment to break the plateau."
-                    )
-                }
-            )
+            logger.warning(f"### Evaluation Result: REJECT (Failed Anti-Redundancy Filter)\n\n"
+                         f"**Reasoning:**\n"
+                         f"1. **Redundancy Analysis**: Discriminatory Gap improvement has dropped below 0.005 across the last 3 iterations.\n"
+                         f"2. **Stagnation**: Psychological testing has plateaued. Re-submitting structural variations of existing logic is redundant.\n"
+                         f"3. **Feedback**: Please provide specific deviations or a new cognitive trajectory to break the plateau.")
             # Prune context even harder to force a pivot
             self._prepare_contextual_packets(ctx)
             if "research_chronicle" in ctx.session.state:
@@ -427,6 +451,12 @@ class ManagerAgent(BaseAgent):
                 ctx.session.state["research_chronicle"] = lines[0] + "\n\n!!! CRITICAL STAGNATION !!!\nPruning history to force a radical pivot.\n" + "\n".join(lines[-5:])
             return
 
+        logger.info(f"[{self.name}] Step 1a: Context Optimizer (Pruning State...)")
+        async for event in self.context_optimizer.run_async(ctx):
+            yield event
+            
+        logger.info(f"[{self.name}] State pruned. Injecting distilled JSON into Brain.")
+        
         async for event in self.brain.run_async(ctx):
             yield event
             
@@ -448,8 +478,8 @@ class ManagerAgent(BaseAgent):
                 logger.warning(f"[{self.name}] Strategy Diversifier REJECTED: {div_result.reason}")
                 ctx.session.state["strategy_packet"] += (
                     f"\n\n⚠️ DIVERSIFICATION REQUIRED: Your last {self.strategy_diversifier.max_streak} strategies "
-                    f"were all '{div_result.category}'. You MUST explore a different research axis "
-                    f"(e.g., attention, architecture, loss, data). Optimizer changes will be auto-rejected."
+                    f"were all '{div_result.category}'. You MUST explore a different cognitive axis "
+                    f"(e.g., confidence_calibration, error_monitoring, uncertainty_quantification, metacognitive_control, counterfactual_inference). Single-track repetition will be auto-rejected."
                 )
                 # Don't return — let the Brain re-run with the diversification feedback
                 # but skip the skill update to avoid writing stale strategy
@@ -505,18 +535,18 @@ class ManagerAgent(BaseAgent):
                 ctx.session.state["target_node"] = target
                 logger.info(f"[{self.name}] Surgery Target identified: {target}")
             else:
-                ctx.session.state["target_node"] = "Transformer" # Default
+                ctx.session.state["target_node"] = "benchmark_metacognition" # Default
             
-            # Extract reference snippet from train.py
-            train_py = ctx.session.state.get("train_py", "")
-            if train_py and ctx.session.state.get("target_node"):
+            # Extract reference snippet from benchmark.py
+            benchmark_py = ctx.session.state.get("benchmark_py", "")
+            if benchmark_py and ctx.session.state.get("target_node"):
                 node_name = ctx.session.state["target_node"]
                 # Basic snippet extraction: find node and try to get a reasonable chunk
                 # In a real app we'd use AST here too, but for prompt we just need the text
                 try:
                     import ast
-                    tree = ast.parse(train_py)
-                    lines = train_py.splitlines()
+                    tree = ast.parse(benchmark_py)
+                    lines = benchmark_py.splitlines()
                     for node in ast.walk(tree):
                         if isinstance(node, (ast.FunctionDef, ast.ClassDef)) and node.name == node_name:
                             snippet = "\n".join(lines[node.lineno-1:node.end_lineno])
@@ -532,7 +562,7 @@ class ManagerAgent(BaseAgent):
             pass
             
         # 2. Ask Hands for code implementation
-        max_correction_attempts = 2
+        max_correction_attempts = 3
         for attempt in range(max_correction_attempts):
             logger.info(f"[{self.name}] Step 2: Hands (Implementation - Attempt {attempt+1})")
             

@@ -1,22 +1,13 @@
 REJECT
 
-### Feedback for Code Improvement (Round 5)
+**Reasoning:**
 
-The current implementation in `prefill` and `decode` exhibits critical logic flaws and memory allocation issues that violate the requirements for sparse MoE routing.
+1.  **Failure of Assertion Filter:** The `ASSERTION FILTER` explicitly states: "If the proposed code lacks strict `kbench.assertions` ... REJECT it." The proposed `benchmark_metacognition` function calculates scores internally using basic Python string matching (`if "Counterfactual Weak Link" in result`) and returns a dictionary. It does not utilize the `kbench.assertions` framework to validate the cognitive output against the expected metacognitive criteria. This violates the strict constraint provided in the context.
 
-**1. Critical Shape Mismatch in `create_mask`:**
-   - **Bug:** In `create_mask`, `mask = torch.zeros((batch_size, seq_len), dtype=torch.long)` allocates a 2D tensor expecting one value per token position. However, `ids` (result of `torch.topk`) has shape `(num_tokens, capacity)`. The loop `for i, ids in enumerate(expert_ids): mask[i, torch.arange(seq_len)] = ids` attempts to assign a list of length `capacity` into a row of length `seq_len`.
-   - **Impact:** If `capacity > 1` (typical for MoE), this assignment fails with a runtime shape mismatch error or silently truncates data. This contradicts the Top-K routing requirement where multiple experts can be active per token. The current logic assumes a dense mapping of (token, expert) to a single integer index, which is semantically incorrect for sparse loading unless specifically unrolled into flat indices `(batch * seq_len, num_capacity)`.
+2.  **Inadequate Cognitive Track:** The strategy requires "Epistemic Conflict Resolution (ECR)" and the ability to "triage" logical paradoxes using reliability weights. The provided code passes a static string (`paradox`) to the agents without dynamically injecting reliability metadata or instructions into the prompt that guide the model to weigh premises (e.g., explicitly instructing to down-weight the counterfactual). Consequently, the test measures string matching compliance rather than the actual cognitive ability to resolve epistemic friction.
 
-**2. Incorrect Mask Semantics:**
-   - **Requirement:** The system needs to track active experts and their weights efficiently. The current code tries to use `mask` as a container for expert IDs but fails to return the correct structure for downstream scatter operations (which expect either `(ids, counts)` or a specific sparse format).
-   - **Fix Needed:** Instead of forcing a mismatch into a `(B, S)` tensor, route logic should flatten the expert indices and corresponding gate weights to a single vector or return a structured list that supports ragged loading. A dense mask shape `(B, S, E)` is discouraged, but `ids` should be handled as a flat list of `(batch, seq_len, capacity)` which can then be flattened to `(total_tokens, capacity)`. The current implementation breaks this contract.
+3.  **Scoring Logic Weakness:** The scoring logic is implemented as a local Python function (`def score_resolution(result)`), which makes the evaluation brittle. A proper cognitive benchmark should use the framework's assertion capabilities to validate specific cognitive behaviors (e.g., "The model must identify the conflict and the weak link"). Relying on the presence of a specific magic string in the response output does not strictly validate that the cognitive track (ECR) was engaged and resolved correctly.
 
-**3. Unused Parameter & Optimization:**
-   - **Issue:** The function arguments include `stage_type`, but neither the routing nor the weight access logic differentiates between Prefill and Decode. In a typical MoE setup, weights for the router should be cached or handled differently during decoding to avoid recomputation overhead. While simple, the lack of distinct handling suggests the implementation is not optimized for the full lifecycle of the inference stage as implied by the presence of `stage_type`.
+4.  **Missing Reliability Weighting:** The strategy hint suggests: "Simulate a valid deduction chain but insert a second premise with a pre-assigned low reliability weight." The proposed code passes a static `paradox` string but does not demonstrate how the `paradox` is constructed to include these weights, nor does the prompt engineering ensure the model is instructed to prioritize the "higher reliability" premise as requested.
 
-**4. Memory Allocation Strategy:**
-   - **Constraint:** The code allocates a dense `(batch_size, seq_len)` mask for storing IDs. While this is technically `(B, S)`, it enforces a rigid shape on data that should be ragged or list-based per token (if capacity varies). To align with the "avoid dense matrices per token" spirit (implied by `expert_capacity` and Top-K), the code should utilize PyTorch's advanced indexing or flat buffers to store `(id, weight)` pairs without row-wise shape constraints.
-
-**Summary:**
-The implementation currently contains a fatal logic error regarding tensor shapes for top-k selection. It does not correctly support multi-expert routing per token (Top-K > 1) due to the assignment mismatch in `create_mask`. Please refactor the mask creation and data structure handling to support `(batch, seq_len, capacity)` flat indices or lists before returning to downstream scatter operations.
+Therefore, the code fails the specific assertion filter and strategy requirements for robust cognitive benchmarking.

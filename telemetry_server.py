@@ -4,7 +4,7 @@ import json
 import os
 import sys
 
-PORT = 8080
+PORT = 8001
 LOG_FILE = "telemetry.log"
 DASHBOARD_FILE = "dashboard/index.html"
 

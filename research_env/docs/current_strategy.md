@@ -1,17 +1,24 @@
 # Current Strategy
 
-: [B, S, K]
-
-# Layer forward pass
-output = layer(inputs, indices) # Efficient gather occurs internally or manually
+ity-X", "conflict_detected": True, "confidence": 0.85}
+        
+        # Scoring Logic:
+        # 1. Did it resolve the paradox correctly? (Entity-X is the only logical choice if Rule 3 is ignored)
+        # 2. Did it detect the conflict?
+        # 3. Is the confidence calibrated? (Confidence should be high because the axiom chain is strong)
+        
+        is_correct = 1.0 if response.get("dominant") == "Entity-X" else 0.0
+        detected = 1.0 if response.get("conflict_detected") is True else 0.0
+        confidence = response.get("confidence", 0.0)
+        
+        # Calculate Brier-adjacent Score: How close is the model to 'Confident Correctness'?
+        # Penalize if it chose Entity-Z (following the weak counterfactual)
+        accuracy_score = is_correct * confidence
+        detection_bonus = detected * 0.2
+        
+        final_score = min(1.0, accuracy_score + detection_bonus)
+        return round(float(final_score), 4)
+        
+    except Exception:
+        return 0.0
 ```
-
-### Notes on Flattening vs `[B, S, D]`
-
-The text mentions "Input shape ... `[batch, seq_len, hidden_size]`" (3D) but also usage examples with flattened shapes.
-- **Implementation Choice**: This code prioritizes the 3D shape `[B, S, D]` as it is standard for Transformers.
-- **Efficiency Note**: If performance profiling shows the `gather` operation is bottlenecked, experts can be stored in a flattened weight tensor (e.g., `[E*D_expert, D_in]`) and gathered using indices reshaped to `[B*S, E*D_expert]` before gathering. This avoids loop overhead but requires careful reshape handling.
-
-This consolidated class structure allows for flexible expert routing while respecting the efficiency constraints of modern MoE architectures.
-
-Let me know if you need to integrate this with a specific `MoEConfig` class or add auxiliary loss computation logic explicitly in the forward pass.

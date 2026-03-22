@@ -6,7 +6,9 @@ from fastmcp import FastMCP
 logger = logging.getLogger(__name__)
 mcp = FastMCP("Research Assistant 🧪")
 
-SAFE_REPO_PATH = "/Users/surfiniaburger/Desktop/mental-research-swarm/research_env"
+# Try to get path from environment, default to current directory's research_env
+DEFAULT_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "research_env")
+SAFE_REPO_PATH = os.environ.get("SAFE_REPO_PATH", DEFAULT_PATH)
 
 @mcp.tool()
 async def execute_command(command: str, cwd: str = SAFE_REPO_PATH, timeout: int = 300) -> str:

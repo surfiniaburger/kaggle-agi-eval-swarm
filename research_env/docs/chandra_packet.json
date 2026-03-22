@@ -1,0 +1,28 @@
+{
+  "research_context": "DeepMind Cognitive Framework (AGI Progress)",
+  "focus_faculty": "Metacognition",
+  "primary_source": {
+    "title": "How to measure metacognition",
+    "authors": ["Fleming, S. M.", "Lau, H. C."],
+    "year": 2014,
+    "key_concept": "Metacognitive Efficiency (M-Ratio)",
+    "formula": "meta-d' / d'"
+  },
+  "signal_sharpening_heuristics": [
+    {
+      "name": "Confidence Sensitivity Analysis",
+      "description": "The ability of the model to distinguish between its own correct and incorrect responses across varying difficulty levels (d').",
+      "goal": "Minimize the gap between meta-d' and d'."
+    },
+    {
+      "name": "The Calibration Trap",
+      "description": "Designing tasks where simple pattern matching leads to a 'right' answer but high confidence on 'wrong' answers (e.g., misleading logical syllogisms).",
+      "metric": "Expected Calibration Error (ECE)"
+    }
+  ],
+  "benchmark_recommendations": [
+    "Tasks must require a Forced Choice followed by a Confidence Rating.",
+    "Targeted faculties: Error self-detection, confidence-weighted decision making.",
+    "Avoid: Direct accuracy-only metrics which fail to capture the 'jaggedness' of machine intelligence."
+  ]
+}
